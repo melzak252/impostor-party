@@ -1,0 +1,25 @@
+{
+  "name": "impostor-party",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --watch server/index.ts",
+    "build": "original=$(mktemp) && cp client/index.html \"$original\" && trap 'cp \"$original\" client/index.html; rm -f \"$original\"' EXIT && bun build --target=bun --production --outdir=dist --public-path=/ ./server/index.ts && cp client/index.html dist/index.html",
+    "start": "cd dist && NODE_ENV=production bun index.js",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test ./tests"
+  },
+  "dependencies": {
+    "react": "19",
+    "react-dom": "19",
+    "react-router": "7",
+    "zod": "4"
+  },
+  "devDependencies": {
+    "typescript": "5.9",
+    "@types/bun": "latest",
+    "@types/react": "19",
+    "@types/react-dom": "19"
+  }
+}

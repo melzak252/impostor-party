@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Impostor Party — home design concept</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600&display=swap" rel="stylesheet">
+<!-- Standalone visual concept, not connected to the live game.
+     Design process informed by unslop, Damir Sokolovsky (@heydamir), CC BY 4.0.
+     Character artwork and page composition are original to this concept. -->
+<style>
+:root{color-scheme:light;--ink:#163b36;--stage:#28b8a4;--cream:#fffbea;--yellow:#ffcf55;--soft:#d2f2df;--muted:#51665d;--edge:#d2dcca;font-family:"Bricolage Grotesque",system-ui,sans-serif;color:var(--ink);background:var(--stage);font-synthesis:none}
+*{box-sizing:border-box}body{margin:0;min-width:320px}button,input{font:inherit}button,a{-webkit-tap-highlight-color:transparent}button{cursor:pointer}a{color:inherit;text-decoration:none}:focus-visible{outline:3px solid var(--ink);outline-offset:4px}
+.shell{min-height:100svh;display:flex;flex-direction:column;max-width:1504px;margin:auto;padding:28px 56px 24px}
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:24px}
+.brand{display:flex;align-items:center;gap:10px;font-size:18px;font-weight:600;letter-spacing:-.4px}.brand svg{width:32px;height:32px}
+.nav{display:flex;align-items:center;gap:32px;font-size:14px;font-weight:500}.nav a{border-bottom:1px solid transparent;padding:8px 0}.nav a:hover{border-bottom-color:currentColor}.language{display:flex;align-items:center;gap:8px;border:1px solid #168d7d;border-radius:8px;padding:8px 12px;background:transparent;color:var(--ink)}.language svg{width:16px;height:16px}
+.main{flex:1;display:grid;grid-template-columns:minmax(0,1.2fr) minmax(340px,.8fr);align-items:center;gap:64px;width:100%;max-width:1168px;margin:24px auto 20px}
+.hero{position:relative;min-width:0}.kicker{margin:0 0 16px;font-size:15px;font-weight:500}.title{position:relative;z-index:1;margin:0;color:var(--cream);font-size:clamp(72px,7.8vw,112px);font-weight:600;letter-spacing:-6px;line-height:.82;transform:rotate(-3deg);paint-order:stroke fill;-webkit-text-stroke:2px var(--ink);text-shadow:0 5px 0 var(--ink)}.title span{display:block;margin-left:128px;color:var(--yellow);font-size:1.16em;letter-spacing:-7px}.hero-description{position:relative;z-index:2;max-width:350px;margin:24px 0 0 8px;font-size:21px;line-height:1.25;letter-spacing:-.3px;font-weight:500}.scene{display:block;width:calc(100% + 40px);max-width:660px;height:auto;margin:-12px -24px -12px}.hero-caption{margin:0 0 0 12px;font-size:13px;font-weight:500;color:#17594c;display:flex;align-items:center;gap:10px}.hero-caption::before{content:"";width:28px;height:2px;background:currentColor}
+.play-area{position:relative;padding-bottom:10px}.paper-corner{position:absolute;z-index:0;top:20px;right:-12px;bottom:64px;left:12px;border:2px solid var(--ink);border-radius:24px;background:#b8e7c9;transform:rotate(2deg)}
+.play-panel{position:relative;z-index:1;border:2px solid var(--ink);border-radius:24px;background:var(--cream);padding:32px;box-shadow:0 7px 0 var(--ink)}
+.panel-top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:20px}.panel-top h2{font-size:30px;line-height:1.05;letter-spacing:-1px;font-weight:600;margin:0}.seat-tag{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);white-space:nowrap}.seat-tag svg{width:16px;height:16px}
+.intro{margin:0 0 24px;color:var(--muted);font-size:15px;line-height:1.4;max-width:29ch}.field-label{display:block;margin-bottom:8px;font-size:14px;font-weight:500}input{width:100%;min-width:0;height:52px;padding:12px 16px;color:var(--ink);background:white;border:1.5px solid #adbfaa;border-radius:10px;font-size:17px}input::placeholder{color:#718071}input:focus{border-color:var(--ink);outline-offset:3px}
+.visibility{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:16px 0 20px}.visibility-label{font-size:13px;color:var(--muted)}.room-options{display:flex;align-items:center;gap:4px;padding:4px;background:#e8eddf;border-radius:8px}.room-options label{display:flex;align-items:center;gap:4px;position:relative}.room-options input{position:absolute;opacity:0;width:1px;height:1px}.room-options span{padding:6px 10px;font-size:12px;line-height:1;border-radius:5px;color:var(--muted)}.room-options input:checked+span{background:white;box-shadow:0 1px 2px #163b3620;color:var(--ink)}.room-options input:focus-visible+span{outline:2px solid var(--ink);outline-offset:2px}
+.primary{width:100%;display:flex;align-items:center;justify-content:center;gap:12px;min-height:56px;padding:12px 16px;border:2px solid var(--ink);border-radius:12px;background:var(--yellow);box-shadow:0 4px 0 var(--ink);color:var(--ink);font-size:19px;font-weight:600;transition:background-color 150ms ease-out,transform 150ms ease-out,box-shadow 150ms ease-out}.primary svg{width:20px;height:20px}.primary:hover{background:#ffdb7d}.primary:active{transform:translateY(3px);box-shadow:0 1px 0 var(--ink)}
+.divider{display:flex;align-items:center;gap:12px;margin:28px 0 20px;color:var(--muted);font-size:12px}.divider::before,.divider::after{content:"";height:1px;flex:1;background:var(--edge)}
+.join-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}.join-row input{height:48px;font-size:15px}.join{display:flex;align-items:center;justify-content:center;gap:8px;padding:8px 16px;background:transparent;border:1.5px solid var(--ink);border-radius:10px;color:var(--ink);font-size:15px;font-weight:500;transition:background-color 150ms ease-out}.join:hover{background:#e8eddf}.join svg{width:16px;height:16px}.menu-foot{display:flex;justify-content:center;align-items:center;gap:8px;margin:24px 0 0;font-size:13px;color:var(--muted)}.menu-foot svg{width:16px;height:16px}.public-link{position:relative;z-index:2;display:block;width:100%;border:0;background:transparent;text-align:center;padding:28px 8px 0;color:var(--ink);font-size:14px;text-decoration:underline;text-underline-offset:4px;text-decoration-color:#187969}.public-link:hover{text-decoration-thickness:2px}
+.bottom{display:flex;align-items:center;justify-content:space-between;gap:20px;border-top:1px solid #148e7b;padding-top:20px;font-size:12px;color:#15564b}.steps{display:flex;align-items:center;gap:24px}.step{display:flex;align-items:center;gap:8px}.step b{display:grid;place-items:center;width:20px;height:20px;border:1px solid #148e7b;border-radius:50%;font-size:11px;font-weight:500}.concept-label{white-space:nowrap}.scene *{vector-effect:non-scaling-stroke}
+@media(min-width:1100px) and (min-height:900px){.main{margin-top:40px;margin-bottom:40px}.scene{margin-top:0}}
+@media(max-width:1050px){.shell{padding:24px 32px}.main{gap:32px;grid-template-columns:minmax(0,1fr) minmax(330px,.85fr)}.title{font-size:82px;letter-spacing:-5px}.title span{margin-left:80px;font-size:1.1em;letter-spacing:-5px}.scene{width:calc(100% + 24px);margin-left:-12px;margin-right:-12px}.play-panel{padding:28px}.hero-description{font-size:19px}.steps{gap:16px}}
+@media(max-width:760px){.shell{padding:20px 20px 24px}.nav{gap:16px}.nav a{display:none}.brand{font-size:16px}.main{grid-template-columns:minmax(0,1fr);gap:24px;max-width:460px;margin:24px auto}.kicker{text-align:center;margin-bottom:16px;font-size:14px}.title{font-size:72px;letter-spacing:-4px;max-width:320px;margin:auto}.title span{font-size:1.08em;margin-left:100px;letter-spacing:-5px}.hero-description{max-width:320px;margin:20px auto 0;text-align:center;font-size:18px}.scene{width:100%;max-height:176px;margin:-8px 0 0;object-fit:contain}.hero-caption{display:none}.play-area{margin:0 8px 0 0}.play-panel{padding:24px}.panel-top h2{font-size:28px}.intro{margin-bottom:20px}.bottom{flex-direction:column;align-items:flex-start;gap:20px}.steps{width:100%;justify-content:space-between;gap:8px}.step{font-size:11px;gap:6px}.step b{width:18px;height:18px;flex:0 0 18px}.concept-label{font-size:11px}.public-link{padding-top:28px}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+<div class="shell">
+<header class="topbar">
+<a class="brand" href="#" aria-label="Impostor Party home"><svg viewBox="0 0 36 36" fill="none" aria-hidden="true"><path d="M5 8Q5 4 10 4H27Q32 4 32 10V24Q32 29 27 29H19L12 34V29H10Q5 29 5 24Z" fill="#fffbea" stroke="#163b36" stroke-width="2"/><path d="M11 12L17 10M22 10L27 12" stroke="#163b36" stroke-width="2.5" stroke-linecap="round"/><circle cx="15" cy="17" r="2" fill="#163b36"/><circle cx="24" cy="17" r="2" fill="#163b36"/></svg>Impostor Party</a>
+<nav class="nav" aria-label="Main navigation"><a href="#how-to-play">How to play</a><button class="language" type="button" aria-label="Language English"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="10" cy="10" r="7.5"/><ellipse cx="10" cy="10" rx="3" ry="7.5"/><path d="M3 7H17M3 13H17"/></svg>EN</button></nav>
+</header>
+<main class="main">
+<section class="hero" aria-label="About Impostor Party">
+<p class="kicker">Your friends. Their answers. One impostor.</p>
+<h1 class="title">Impostor<span>Party</span></h1>
+<p class="hero-description">One odd question.<br>A room full of suspects.</p>
+<svg class="scene" viewBox="0 0 640 340" role="img" aria-labelledby="scene-title">
+<title id="scene-title">Three original cartoon suspects exchange suspicious glances over their question cards at a game-night table</title>
+<g stroke="#163b36" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
+<!-- Physical floor and table shadows -->
+<ellipse cx="314" cy="313" rx="247" ry="15" fill="#159f8e" stroke="none"/>
+<!-- The coral friend, leaning in with their card -->
+<path d="M72 226L63 276Q59 296 80 299L106 298L120 242" fill="#ee7959"/>
+<path d="M71 276L61 292Q57 304 80 305H109L106 289" fill="#fffbea"/>
+<path d="M109 229L127 282Q133 297 152 292L167 283L150 231" fill="#ee7959"/>
+<path d="M139 281L143 301H172Q181 294 167 282" fill="#fffbea"/>
+<path d="M64 133Q52 115 65 95L55 82L82 87L89 65L108 82L130 72L141 94Q176 103 177 140L172 215Q172 245 136 249L86 245Q54 241 56 211Z" fill="#ff8b69"/>
+<path d="M65 190Q80 212 106 216Q145 223 170 203L172 222Q165 249 135 249L86 245Q58 241 56 214Z" fill="#ef755a" stroke="none"/>
+<path d="M75 122L94 117M122 120L141 115" fill="none" stroke-width="5"/>
+<path d="M76 134Q84 128 93 133L92 152Q83 158 76 151Z" fill="#fffbea"/>
+<path d="M121 133Q131 128 139 133L138 152Q129 157 121 151Z" fill="#fffbea"/>
+<ellipse cx="90" cy="142" rx="3" ry="6" fill="#163b36" stroke="none"/>
+<ellipse cx="135" cy="142" rx="3" ry="6" fill="#163b36" stroke="none"/>
+<path d="M96 175Q113 182 126 170" fill="none"/>
+<path d="M58 181Q33 180 34 207Q35 224 57 226L76 216" fill="#ff8b69"/>
+<!-- The golden friend is watching the odd one -->
+<path d="M258 218L251 284L279 286L291 229M308 225L322 284L350 277L337 214" fill="#ffd15f"/>
+<path d="M250 279L243 297H284L283 283M321 279L321 296H363Q366 288 348 280" fill="#fffbea"/>
+<path d="M235 85Q232 56 266 49L270 38L286 46L302 35L312 48Q351 50 354 85L363 190Q365 227 333 236L276 238Q239 235 236 202Z" fill="#ffd15f"/>
+<path d="M240 177Q261 193 300 190Q343 189 359 173L363 200Q359 229 333 236L276 238Q243 236 237 206Z" fill="#efba45" stroke="none"/>
+<path d="M252 80L276 84M309 78L333 70" fill="none" stroke-width="5"/>
+<path d="M254 99Q267 92 280 99L280 117Q266 126 255 117ZM307 98Q319 91 333 98L334 116Q321 125 309 116Z" fill="#fffbea"/>
+<ellipse cx="275" cy="108" rx="4" ry="7" fill="#163b36" stroke="none"/>
+<ellipse cx="329" cy="107" rx="4" ry="7" fill="#163b36" stroke="none"/>
+<path d="M285 147Q298 141 314 148" fill="none"/>
+<path d="M240 153Q215 149 211 170Q209 187 235 199L252 187" fill="#ffd15f"/>
+<path d="M349 143Q380 133 382 159Q384 178 355 189L340 175" fill="#ffd15f"/>
+<!-- The suspicious violet friend with a raised eyebrow -->
+<path d="M475 213L468 283L493 286L511 222M522 220L538 284L564 279L553 209" fill="#b9a2ec"/>
+<path d="M467 279L455 296Q456 302 498 300L496 284M537 278L539 299H577Q583 290 562 279" fill="#fffbea"/>
+<path d="M449 104Q444 80 467 70L461 59L486 65Q497 48 515 50Q531 51 541 67Q574 67 582 96L591 193Q593 228 560 240L496 244Q458 240 454 208Z" fill="#b9a2ec"/>
+<path d="M458 183Q484 203 521 198Q557 194 587 176L591 200Q587 230 558 240L496 244Q463 240 455 211Z" fill="#a18bce" stroke="none"/>
+<path d="M468 106L494 96M525 90Q541 79 558 91" fill="none" stroke-width="5"/>
+<path d="M471 121Q485 114 499 120L498 139Q483 147 472 139ZM528 116Q542 109 556 114L558 134Q544 142 530 135Z" fill="#fffbea"/>
+<ellipse cx="478" cy="130" rx="4" ry="7" fill="#163b36" stroke="none"/>
+<ellipse cx="535" cy="124" rx="4" ry="7" fill="#163b36" stroke="none"/>
+<path d="M500 166Q518 179 539 158" fill="none"/>
+<path d="M458 163Q426 155 424 181Q427 198 460 205" fill="#b9a2ec"/>
+<path d="M584 161Q610 151 616 173Q620 193 589 204L571 191" fill="#b9a2ec"/>
+<!-- The same small physical question cards, not decorative boxes -->
+<g transform="rotate(-12 95 206)"><rect x="65" y="180" width="55" height="72" rx="5" fill="#fffbea"/><path d="M78 193H107M78 202H100" stroke="#b2bfa8" stroke-width="2"/></g>
+<path d="M64 214Q55 206 55 218Q55 229 68 229L80 221" fill="#ff8b69"/>
+<g transform="rotate(9 300 203)"><rect x="268" y="169" width="57" height="76" rx="5" fill="#fffbea"/><path d="M280 184H311M280 194H303" stroke="#b2bfa8" stroke-width="2"/></g>
+<path d="M326 205Q342 196 344 208Q345 220 326 225L316 216" fill="#ffd15f"/>
+<g transform="rotate(12 516 214)"><rect x="489" y="181" width="57" height="76" rx="5" fill="#fffbea"/><path d="M507 199Q506 192 515 192Q527 192 526 202Q526 208 518 211V219" fill="none" stroke-width="4"/><circle cx="518" cy="229" r="2" fill="#163b36" stroke="none"/></g>
+<path d="M544 219Q558 207 563 220Q565 230 549 236L536 231" fill="#b9a2ec"/>
+<!-- A tangible shared tabletop -->
+<path d="M136 265L143 309L167 312L177 267M457 266L470 311L494 307L494 264" fill="#ebc483"/>
+<path d="M99 251Q105 224 309 225Q530 226 540 253L530 276Q316 307 108 276Z" fill="#128e7c"/>
+<ellipse cx="320" cy="250" rx="221" ry="30" fill="#96dfbd"/>
+<g transform="rotate(-9 270 247)"><rect x="241" y="233" width="54" height="33" rx="4" fill="#fffbea"/><path d="M253 244H281M253 253H274" stroke="#b2bfa8" stroke-width="2"/></g>
+<g transform="rotate(9 365 254)"><rect x="340" y="242" width="48" height="31" rx="4" fill="#ffcf55"/><path d="M352 253H376M352 261H369" stroke="#b18b38" stroke-width="2"/></g>
+</g>
+</svg>
+<p class="hero-caption">Don’t trust the most confident answer.</p>
+</section>
+<section class="play-area" aria-labelledby="play-title">
+<div class="paper-corner" aria-hidden="true"></div>
+<div class="play-panel">
+<div class="panel-top"><h2 id="play-title">Who’s joining?</h2><span class="seat-tag"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="7" cy="6" r="2.5"/><path d="M2.5 16V14Q2.5 10 7 10Q11.5 10 11.5 14V16M13 4Q17 4 17 7Q17 10 14 10M14 12Q18 12 18 16"/></svg>3–6 players</span></div>
+<p class="intro">Bring your friends. Keep your question to yourself.</p>
+<label class="field-label" for="concept-name">Your name</label>
+<input id="concept-name" name="name" value="Melzak" maxlength="20" autocomplete="off">
+<div class="visibility"><span class="visibility-label">Create a room</span><div class="room-options" role="group" aria-label="Room visibility"><label><input type="radio" name="visibility" value="private" checked><span>Private</span></label><label><input type="radio" name="visibility" value="public"><span>Public</span></label></div></div>
+<button class="primary" type="button">Create party<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12H20M14 6L20 12L14 18"/></svg></button>
+<div class="divider">Got an invite?</div>
+<label class="field-label" for="concept-code">Join with a code</label>
+<div class="join-row"><input id="concept-code" name="code" placeholder="Room code" maxlength="6" autocomplete="off"><button class="join" type="button">Join<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10H16M11 5L16 10L11 15"/></svg></button></div>
+<p class="menu-foot"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M10 2L16 5V10Q16 15 10 18Q4 15 4 10V5Z"/><path d="M7 10L9 12L13 8"/></svg>No account needed</p>
+</div>
+<button class="public-link" type="button">Or find a public room</button>
+</section>
+</main>
+<footer class="bottom" id="how-to-play"><div class="steps"><span class="step"><b>1</b>Answer privately</span><span class="step"><b>2</b>Compare answers</span><span class="step"><b>3</b>Find the impostor</span></div><span class="concept-label">Home concept · visual only · not connected to the game</span></footer>
+</div>
+</body>
+</html>
