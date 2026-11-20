@@ -1,4 +1,5 @@
 import type { GameLanguage } from "../shared/protocol";
+import { isNativeLocalizedQuestion } from "./questionsLocalized";
 
 const translationCache = new Map<string, string>();
 const TRANSLATE_TIMEOUT_MS = 2500;
@@ -32,6 +33,7 @@ const POLISH_OVERRIDES: Readonly<Record<string, string>> = {
 
 export async function translateText(text: string, targetLang: GameLanguage): Promise<string> {
   if (targetLang === "en" || !text.trim()) return text;
+  if (isNativeLocalizedQuestion(targetLang, text)) return text;
   if (targetLang === "pl") {
     const override = POLISH_OVERRIDES[text];
     if (override) return override;

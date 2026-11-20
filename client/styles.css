@@ -23,7 +23,7 @@
   --positive: #15804f;
   --negative: #c42b33;
   --panel-radius: 22px;
-  --font-display: "Fredoka", "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+  --font-display: "Rubik", "Space Grotesk", "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
   --font-body: "Space Grotesk", "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
   font-family: var(--font-body);
   background: var(--stage);
@@ -2046,4 +2046,81 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
   }
   .private-question-flip.is-shuffling { animation: none; transform: rotateY(180deg); }
   .round-answer-voter-dots li { animation-delay: 0ms !important; }
+}
+
+.app-version-tag {
+  position: fixed;
+  right: 12px;
+  bottom: 10px;
+  z-index: 40;
+  padding: 3px 8px;
+  border: 1.5px solid rgba(255, 255, 255, .28);
+  border-radius: 8px;
+  background: rgba(20, 12, 42, .55);
+  color: rgba(255, 255, 255, .85);
+  font-family: var(--font-display);
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .04em;
+  opacity: .42;
+  pointer-events: auto;
+  transition: opacity 150ms ease;
+}
+.app-version-tag:hover { opacity: .95; }
+
+.questions-shell {
+  display: grid;
+  gap: 14px;
+}
+.questions-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) repeat(3, minmax(140px, 1fr));
+  gap: 10px;
+}
+.questions-stats {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.questions-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.question-tracker-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border: 2.5px solid var(--ink);
+  border-radius: 14px;
+  background: var(--paper);
+  box-shadow: 3px 3px 0 var(--ink);
+}
+.question-tracker-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.question-tracker-pill {
+  padding: 2px 8px;
+  border: 2px solid var(--ink);
+  border-radius: 8px;
+  background: var(--paper-tint);
+  color: var(--ink);
+  font-size: .72rem;
+  font-weight: 700;
+}
+.question-tracker-pill.is-spicy {
+  background: var(--coral);
+  color: #fff;
+}
+@media (max-width: 720px) {
+  .questions-toolbar { grid-template-columns: minmax(0, 1fr); }
+  .question-tracker-item { grid-template-columns: minmax(0, 1fr); }
 }

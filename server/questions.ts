@@ -1,7 +1,8 @@
-import type { QuestionPair } from "../shared/protocol";
+import { APP_VERSION, type GameLanguage, type QuestionPair } from "../shared/protocol";
 import { POP_QUESTION_ITEMS } from "./questionsPop";
 import { PARTY_QUESTION_ITEMS } from "./questionsParty";
 import { TOPIC_QUESTION_ITEMS } from "./questionTopics";
+import { getLocalizedItems, getLocalizedPairs } from "./questionsLocalized";
 
 interface QuestionPoolItem {
   id: string;
@@ -129,6 +130,40 @@ const SPICY_BUILTIN_CATALOGUE: readonly QuestionPair[] = [
   ...ALL_MIXED_PAIRS,
 ];
 
-export function getBuiltinQuestionPairs(spicyMode: boolean): readonly QuestionPair[] {
-  return spicyMode ? SPICY_BUILTIN_CATALOGUE : FRIENDLY_BUILTIN_CATALOGUE;
+export function getBuiltinQuestionPairs(spicyMode: boolean, language: GameLanguage = "en"): readonly QuestionPair[] {
+  const base = spicyMode ? SPICY_BUILTIN_CATALOGUE : FRIENDLY_BUILTIN_CATALOGUE;
+  if (language === "en") return base;
+  const localized = getLocalizedPairs(language, spicyMode);
+  return localized.length > 0 ? [...localized, ...base] : base;
+}
+
+export function getQuestionCatalog() {
+  const englishPoolQuestions = ALL_POOL_ITEMS.map((item) => ({
+    id: item.id,
+    pool: item.pool,
+    language: "en",
+    angle: item.angle ?? "weird",
+    spicy: Boolean(item.spicy),
+    text: item.text,
+  }));
+  const classicQuestions = GOOD_BUILTIN_PAIRS.flatMap((pair) => [
+    { id: `${pair.id}-a`, pool: "classic", language: "en", angle: "classic", spicy: false, text: pair.normalQuestion },
+    { id: `${pair.id}-b`, pool: "classic", language: "en", angle: "classic", spicy: false, text: pair.impostorQuestion },
+  ]);
+  const localizedQuestions = getLocalizedItems().map((item) => ({
+    id: item.id,
+    pool: item.pool,
+    language: item.language,
+    angle: item.angle,
+    spicy: Boolean(item.spicy),
+    text: item.text,
+  }));
+  const questions = [...englishPoolQuestions, ...localizedQuestions, ...classicQuestions];
+  return {
+    version: APP_VERSION,
+    totalQuestions: questions.length,
+    friendlyCombos: FRIENDLY_BUILTIN_CATALOGUE.length,
+    spicyCombos: SPICY_BUILTIN_CATALOGUE.length,
+    questions,
+  };
 }

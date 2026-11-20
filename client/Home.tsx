@@ -413,7 +413,9 @@ export function Home() {
       {message && <div className="notice error-notice page-message" role="alert">{message}</div>}
       <footer className="page-footer">
         <span>{t.home.footerLeft}</span>
-        <span>{t.home.footerRight}</span>
+        <span>
+          <Link to="/questions">Questions</Link> · {t.home.footerRight}
+        </span>
       </footer>
     </main>
   );

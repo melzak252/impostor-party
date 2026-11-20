@@ -3,11 +3,12 @@ import { randomInt as cryptoRandomInt } from "node:crypto";
 import { mkdir, access } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import { z } from "zod";
-import { ActionRequestSchema, GameLanguageSchema } from "../shared/protocol";
+import { ActionRequestSchema, APP_VERSION, GameLanguageSchema } from "../shared/protocol";
 import { PartyError, PartyService, hashSessionToken } from "./party";
 import type { PartySocketIdentity } from "./party";
 import { PartyStore } from "./store";
 import { advanceGameDeadline, applyGameAction } from "./game";
+import { getQuestionCatalog } from "./questions";
 import { translateText } from "./translate";
 
 const MAX_REQUEST_BYTES = 16 * 1024;
@@ -222,7 +223,7 @@ export async function createApp(options: AppOptions): Promise<{ url: string; clo
   let stopping = false;
   let appOrigin = options.appOrigin ? new URL(options.appOrigin).origin : undefined;
   const allowSameHostOrigin = Boolean(options.allowSameHostOrigin);
-  const routes = process.env.NODE_ENV === "production" ? {} : { "/": index, "/join/:code": index, "/party/:code": index };
+  const routes = process.env.NODE_ENV === "production" ? {} : { "/": index, "/join/:code": index, "/party/:code": index, "/questions": index };
 
   let server: Bun.Server<PartySocketIdentity>;
   try {
@@ -254,7 +255,7 @@ export async function createApp(options: AppOptions): Promise<{ url: string; clo
         if (
           process.env.NODE_ENV === "production"
           && request.method === "GET"
-          && (path === "/" || /^\/(?:join|party)\/[^/]+$/.test(path))
+          && (path === "/" || path === "/questions" || /^\/(?:join|party)\/[^/]+$/.test(path))
         ) {
           const html = Bun.file(join(process.cwd(), "index.html"));
           if (await html.exists()) return new Response(html);
@@ -263,6 +264,14 @@ export async function createApp(options: AppOptions): Promise<{ url: string; clo
         try {
           if (path === "/healthz" && request.method === "GET") {
             return new Response("ok", { status: 200, headers: { "Content-Type": "text/plain; charset=utf-8" } });
+          }
+
+          if (path === "/api/version" && request.method === "GET") {
+            return apiResponse({ version: APP_VERSION });
+          }
+
+          if (path === "/api/questions" && request.method === "GET") {
+            return apiResponse(getQuestionCatalog());
           }
 
           if (path === "/ws" && request.method === "GET") {

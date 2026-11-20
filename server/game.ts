@@ -35,7 +35,7 @@ function normalizePair(normalQuestion: string, impostorQuestion: string): Omit<Q
 }
 
 function eligibleQuestions(state: PartyState): readonly QuestionPair[] {
-  const builtin = getBuiltinQuestionPairs(Boolean(state.settings.spicyMode));
+  const builtin = getBuiltinQuestionPairs(Boolean(state.settings.spicyMode), state.settings.language ?? "en");
   switch (state.settings.questionSource) {
     case "builtin":
       return builtin;

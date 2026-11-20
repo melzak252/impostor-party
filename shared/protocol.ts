@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+export const APP_VERSION = "1.1.0";
+
 export const PhaseSchema = z.enum(["lobby", "answering", "answers", "question", "voting", "results"]);
 export type Phase = z.infer<typeof PhaseSchema>;
 export const GameLanguageSchema = z.enum(["en", "pl", "es", "de", "fr"]);
