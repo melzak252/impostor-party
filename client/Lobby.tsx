@@ -3,12 +3,34 @@ import { Link, useNavigate, useParams } from "react-router";
 import type { ColorId, PartySettings, PartySnapshot, PlayerSnapshot } from "../shared/protocol";
 import { COLOR_PALETTE } from "../shared/protocol";
 import { ApiError, describeApiError } from "./api";
-import { getStrings, LANGUAGE_OPTIONS, useLanguage, type SupportedLanguage } from "./i18n";
+import {
+  getStrings,
+  LANGUAGE_OPTIONS,
+  useLanguage,
+  type QuestionTopicId,
+  type SupportedLanguage,
+} from "./i18n";
 import { PlayerFace } from "./PlayerFace";
 import { Round } from "./Round";
 import { useParty, type UsePartyResult } from "./useParty";
 
-type PartySettingsWithLanguage = PartySettings & { language?: SupportedLanguage };
+type PartySettingsWithLanguage = PartySettings & {
+  language?: SupportedLanguage;
+  enabledTopics?: QuestionTopicId[];
+};
+
+const TOPIC_IDS: ReadonlyArray<QuestionTopicId> = [
+  "animals",
+  "movies_tv",
+  "actors",
+  "games",
+  "music",
+  "friends",
+  "superpowers",
+  "food_places",
+  "everyday",
+  "pop_life",
+];
 
 function LanguageSelect() {
   const [lang, setLang] = useLanguage();
@@ -273,8 +295,19 @@ function SettingsPanel({
   const [lang, setLang] = useLanguage();
   const t = getStrings(lang);
   const currentGameLanguage = (settings as PartySettingsWithLanguage).language ?? "en";
+  const rawEnabledTopics = (settings as PartySettingsWithLanguage).enabledTopics;
+  const activeTopics: QuestionTopicId[] =
+    rawEnabledTopics && rawEnabledTopics.length > 0 ? rawEnabledTopics : [...TOPIC_IDS];
   const update = (patch: Partial<PartySettingsWithLanguage>) =>
     onChange({ ...settings, ...patch } as PartySettings);
+  const toggleTopic = (topicId: QuestionTopicId) => {
+    const isActive = activeTopics.includes(topicId);
+    if (isActive && activeTopics.length <= 1) return;
+    const nextTopics = TOPIC_IDS.filter((id) =>
+      isActive ? id !== topicId && activeTopics.includes(id) : id === topicId || activeTopics.includes(id),
+    );
+    update({ enabledTopics: nextTopics });
+  };
 
   return (
     <section className="card settings-card">
@@ -387,6 +420,38 @@ function SettingsPanel({
               {LANGUAGE_OPTIONS.find((option) => option.code === currentGameLanguage)?.label ?? "English"}
             </span>
           )}
+        </div>
+
+        <div className="setting-row setting-row-topics">
+          <div>
+            <strong>{t.lobby.topicsLabel}</strong>
+            <span className="setting-description">{t.lobby.topicsDescription}</span>
+          </div>
+          <div className="topic-chips" role={isHost ? "group" : undefined} aria-label={t.lobby.topicsLabel}>
+            {TOPIC_IDS.map((topicId) => {
+              const isActive = activeTopics.includes(topicId);
+              const isLastActive = isActive && activeTopics.length <= 1;
+              return isHost ? (
+                <button
+                  key={topicId}
+                  type="button"
+                  className={`topic-chip${isActive ? " is-active" : ""}`}
+                  aria-pressed={isActive}
+                  disabled={!connected || busy || isLastActive}
+                  onClick={() => toggleTopic(topicId)}
+                >
+                  {t.lobby.topics[topicId]}
+                </button>
+              ) : (
+                <span
+                  key={topicId}
+                  className={`topic-chip is-readonly${isActive ? " is-active" : ""}`}
+                >
+                  {t.lobby.topics[topicId]}
+                </span>
+              );
+            })}
+          </div>
         </div>
       </div>
     </section>

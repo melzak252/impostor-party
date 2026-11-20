@@ -1,5 +1,6 @@
 import { Database } from "bun:sqlite";
 import { z } from "zod";
+import { QuestionTopicIdSchema } from "../shared/protocol";
 import type { PartyState } from "./model";
 
 const ColorIdSchema = z.enum(["coral", "amber", "mint", "cyan", "blue", "violet"]);
@@ -18,6 +19,7 @@ const PartyDocumentSchema = z.object({
     questionSource: z.enum(["builtin", "custom", "mixed"]),
     spicyMode: z.boolean().optional(),
     language: z.enum(["en", "pl", "es", "de", "fr"]).optional(),
+    enabledTopics: z.array(QuestionTopicIdSchema).min(1).optional(),
   }).strict(),
   players: z.array(z.object({
     id: z.string().uuid(),

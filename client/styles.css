@@ -1090,6 +1090,57 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 .setting-description { color: var(--muted); font-size: .8125rem; line-height: 1.3; }
 .setting-row select { min-height: 38px; padding: 6px 8px; font-size: .8125rem; }
 .setting-value { color: var(--cobalt-dark); font-family: var(--font-display); font-weight: 700; text-align: right; }
+.setting-row.setting-row-topics {
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: 8px;
+}
+.topic-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.topic-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 0;
+  padding: 4px 10px;
+  border: 2.5px solid var(--ink);
+  border-radius: 999px;
+  background: var(--paper-tint);
+  color: var(--muted);
+  font-family: var(--font-display);
+  font-size: .75rem;
+  font-weight: 700;
+  line-height: 1.2;
+  cursor: pointer;
+  transition: background-color 120ms ease-out, color 120ms ease-out, transform 120ms ease-out, box-shadow 120ms ease-out;
+}
+.topic-chip:hover:not(:disabled):not(.is-readonly) {
+  background: var(--mint);
+  color: var(--ink);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 0 var(--ink);
+}
+.topic-chip.is-active {
+  background: var(--sun);
+  color: var(--ink);
+  box-shadow: 0 2px 0 var(--ink);
+}
+.topic-chip.is-active:hover:not(:disabled):not(.is-readonly) {
+  background: var(--mint);
+}
+.topic-chip:disabled {
+  cursor: not-allowed;
+  opacity: .55;
+}
+.topic-chip.is-active:disabled {
+  opacity: .9;
+}
+.topic-chip.is-readonly {
+  cursor: default;
+  box-shadow: none;
+}
 
 .custom-questions-card {
   display: flex;

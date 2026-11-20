@@ -431,15 +431,17 @@ export class PartyService {
       if (action.type === "set_settings") {
         if (actor.id !== state.hostId) throw apiError("FORBIDDEN", 403, "Only the host can change party settings.");
         if (state.phase !== "lobby") throw apiError("FORBIDDEN", 403, "Settings can only be changed in the lobby.");
+        const topicsChanged = JSON.stringify(state.settings.enabledTopics ?? null) !== JSON.stringify(action.settings.enabledTopics ?? null);
         const settingsChanged = state.settings.visibility !== action.settings.visibility
           || state.settings.questionRevealMode !== action.settings.questionRevealMode
           || state.settings.questionSource !== action.settings.questionSource
           || (state.settings.spicyMode ?? false) !== (action.settings.spicyMode ?? false)
-          || (state.settings.language ?? "en") !== (action.settings.language ?? "en");
+          || (state.settings.language ?? "en") !== (action.settings.language ?? "en")
+          || topicsChanged;
         if (settingsChanged) {
           const sourceChanged = state.settings.questionSource !== action.settings.questionSource;
           state.settings = { ...action.settings };
-          if (sourceChanged) state.usedQuestionIds = [];
+          if (sourceChanged || topicsChanged) state.usedQuestionIds = [];
           state.version += 1;
           state.updatedAt = now;
           this.store.saveParty(state);

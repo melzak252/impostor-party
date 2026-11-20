@@ -1,10 +1,16 @@
 import type { GameLanguage } from "../shared/protocol";
 import { isNativeLocalizedQuestion } from "./questionsLocalized";
+import { PL_POP_TRANSLATIONS } from "./questionsPlPop";
+import { PL_PARTY_TRANSLATIONS } from "./questionsPlParty";
+import { PL_TOPICS_TRANSLATIONS } from "./questionsPlTopics";
 
 const translationCache = new Map<string, string>();
 const TRANSLATE_TIMEOUT_MS = 2500;
 
 const POLISH_OVERRIDES: Readonly<Record<string, string>> = {
+  ...PL_POP_TRANSLATIONS,
+  ...PL_PARTY_TRANSLATIONS,
+  ...PL_TOPICS_TRANSLATIONS,
   "Pick a random whole number between 1 and 40.": "Wybierz losową liczbę całkowitą od 1 do 40.",
   "Pick a random whole number between 0 and 12.": "Wybierz losową liczbę całkowitą od 0 do 12.",
   "Pick a random whole number between 0 and 10.": "Wybierz losową liczbę całkowitą od 0 do 10.",

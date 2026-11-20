@@ -2,6 +2,18 @@ import { useCallback, useEffect, useState } from "react";
 
 export type SupportedLanguage = "en" | "pl" | "es" | "de" | "fr";
 
+export type QuestionTopicId =
+  | "animals"
+  | "movies_tv"
+  | "actors"
+  | "games"
+  | "music"
+  | "friends"
+  | "superpowers"
+  | "food_places"
+  | "everyday"
+  | "pop_life";
+
 export const LANGUAGE_OPTIONS: ReadonlyArray<{ code: SupportedLanguage; label: string }> = [
   { code: "en", label: "English" },
   { code: "pl", label: "Polski" },
@@ -221,6 +233,9 @@ export interface TranslationStrings {
     gameLanguage: string;
     gameLanguageAria: string;
     gameLanguageDesc: string;
+    topicsLabel: string;
+    topicsDescription: string;
+    topics: Record<QuestionTopicId, string>;
     kickConfirm: (name: string) => string;
     privateRoom: string;
     publicRoom: string;
@@ -479,6 +494,20 @@ const en: TranslationStrings = {
     gameLanguage: "Game language",
     gameLanguageAria: "Game language",
     gameLanguageDesc: "Language used for built-in prompts during rounds.",
+    topicsLabel: "Topics",
+    topicsDescription: "Choose which built-in question topics can appear. At least one must stay active.",
+    topics: {
+      animals: "Animals",
+      movies_tv: "Movies & TV",
+      actors: "Actors",
+      games: "Games",
+      music: "Music",
+      friends: "Friends",
+      superpowers: "Superpowers",
+      food_places: "Food & Places",
+      everyday: "Everyday",
+      pop_life: "Pop & Life",
+    },
     kickConfirm: (name) => `Remove ${name} from this party?`,
     privateRoom: "Private room",
     publicRoom: "Public room",
@@ -740,6 +769,20 @@ const pl: TranslationStrings = {
     gameLanguage: "Język gry",
     gameLanguageAria: "Język gry",
     gameLanguageDesc: "Język wbudowanych pytań podczas rund.",
+    topicsLabel: "Tematy",
+    topicsDescription: "Wybierz tematy wbudowanych pytań. Co najmniej jeden musi pozostać aktywny.",
+    topics: {
+      animals: "Zwierzęta",
+      movies_tv: "Filmy i seriale",
+      actors: "Aktorzy",
+      games: "Gry",
+      music: "Muzyka",
+      friends: "Znajomi",
+      superpowers: "Supermoce",
+      food_places: "Jedzenie i miejsca",
+      everyday: "Codzienność",
+      pop_life: "Popkultura i życie",
+    },
     kickConfirm: (name) => `Usunąć gracza ${name} z tego pokoju?`,
     privateRoom: "Pokój prywatny",
     publicRoom: "Pokój publiczny",
@@ -1000,6 +1043,20 @@ const es: TranslationStrings = {
     gameLanguage: "Idioma del juego",
     gameLanguageAria: "Idioma del juego",
     gameLanguageDesc: "Idioma usado para las preguntas integradas en las rondas.",
+    topicsLabel: "Temas",
+    topicsDescription: "Elige qué temas de preguntas integradas pueden salir. Al menos uno debe seguir activo.",
+    topics: {
+      animals: "Animales",
+      movies_tv: "Cine y TV",
+      actors: "Actores",
+      games: "Juegos",
+      music: "Música",
+      friends: "Amigos",
+      superpowers: "Superpoderes",
+      food_places: "Comida y lugares",
+      everyday: "Día a día",
+      pop_life: "Pop y vida",
+    },
     kickConfirm: (name) => `¿Expulsar a ${name} de esta sala?`,
     privateRoom: "Sala privada",
     publicRoom: "Sala pública",
@@ -1260,6 +1317,20 @@ const de: TranslationStrings = {
     gameLanguage: "Spielsprache",
     gameLanguageAria: "Spielsprache",
     gameLanguageDesc: "Sprache für eingebaute Fragen in den Runden.",
+    topicsLabel: "Themen",
+    topicsDescription: "Wähle aus, welche eingebauten Fragenthemen vorkommen können. Mindestens eines muss aktiv bleiben.",
+    topics: {
+      animals: "Tiere",
+      movies_tv: "Filme & Serien",
+      actors: "Schauspieler",
+      games: "Spiele",
+      music: "Musik",
+      friends: "Freunde",
+      superpowers: "Superkräfte",
+      food_places: "Essen & Orte",
+      everyday: "Alltag",
+      pop_life: "Pop & Leben",
+    },
     kickConfirm: (name) => `${name} aus diesem Raum entfernen?`,
     privateRoom: "Privater Raum",
     publicRoom: "Öffentlicher Raum",
@@ -1520,6 +1591,20 @@ const fr: TranslationStrings = {
     gameLanguage: "Langue du jeu",
     gameLanguageAria: "Langue du jeu",
     gameLanguageDesc: "Langue utilisée pour les questions intégrées pendant les manches.",
+    topicsLabel: "Thèmes",
+    topicsDescription: "Choisis les thèmes de questions intégrées actifs. Au moins un thème doit rester actif.",
+    topics: {
+      animals: "Animaux",
+      movies_tv: "Films et séries",
+      actors: "Acteurs",
+      games: "Jeux",
+      music: "Musique",
+      friends: "Amis",
+      superpowers: "Superpouvoirs",
+      food_places: "Cuisine et lieux",
+      everyday: "Quotidien",
+      pop_life: "Pop et vie",
+    },
     kickConfirm: (name) => `Exclure ${name} de ce salon ?`,
     privateRoom: "Salon privé",
     publicRoom: "Salon public",

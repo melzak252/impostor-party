@@ -1,17 +1,60 @@
 import { z } from "zod";
 
-export const APP_VERSION = "1.1.0";
+export const APP_VERSION = "1.2.0";
 
 export const PhaseSchema = z.enum(["lobby", "answering", "answers", "question", "voting", "results"]);
 export type Phase = z.infer<typeof PhaseSchema>;
 export const GameLanguageSchema = z.enum(["en", "pl", "es", "de", "fr"]);
 export type GameLanguage = z.infer<typeof GameLanguageSchema>;
+export const QuestionTopicIdSchema = z.enum([
+  "animals",
+  "movies_tv",
+  "actors",
+  "games",
+  "music",
+  "friends",
+  "superpowers",
+  "food_places",
+  "everyday",
+  "pop_life",
+]);
+export type QuestionTopicId = z.infer<typeof QuestionTopicIdSchema>;
+export const QUESTION_TOPIC_LIST: ReadonlyArray<{ id: QuestionTopicId; pools: readonly string[] }> = [
+  { id: "animals", pools: ["animals"] },
+  { id: "movies_tv", pools: ["movies", "tv_series"] },
+  { id: "actors", pools: ["actors"] },
+  { id: "games", pools: ["games"] },
+  { id: "music", pools: ["songs", "music_artists"] },
+  {
+    id: "friends",
+    pools: [
+      "table_players",
+      "island_person",
+      "spicy_person",
+      "spicy_scenarios",
+      "spicy_confessions",
+      "pl_table",
+      "pl_spicy",
+      "fr_table",
+      "fr_spicy",
+      "es_table",
+      "es_spicy",
+      "de_table",
+      "de_spicy",
+    ],
+  },
+  { id: "superpowers", pools: ["superpowers"] },
+  { id: "food_places", pools: ["foods", "places", "pl_food", "pl_places", "fr_life", "es_fiesta", "de_alltag"] },
+  { id: "everyday", pools: ["things_objects", "numbers_small", "spicy_numbers", "classic"] },
+  { id: "pop_life", pools: ["characters", "apps", "jobs"] },
+];
 export const PartySettingsSchema = z.object({
   visibility: z.enum(["private", "public"]),
   questionRevealMode: z.enum(["ready", "auto"]),
   questionSource: z.enum(["builtin", "custom", "mixed"]),
   spicyMode: z.boolean().optional(),
   language: GameLanguageSchema.optional(),
+  enabledTopics: z.array(QuestionTopicIdSchema).min(1).optional(),
 }).strict();
 export type PartySettings = z.infer<typeof PartySettingsSchema>;
 export const ColorIdSchema = z.enum(["coral", "amber", "mint", "cyan", "blue", "violet"]);

@@ -1,4 +1,4 @@
-import { APP_VERSION, type GameLanguage, type QuestionPair } from "../shared/protocol";
+import { APP_VERSION, QUESTION_TOPIC_LIST, type GameLanguage, type QuestionPair, type QuestionTopicId } from "../shared/protocol";
 import { POP_QUESTION_ITEMS } from "./questionsPop";
 import { PARTY_QUESTION_ITEMS } from "./questionsParty";
 import { TOPIC_QUESTION_ITEMS } from "./questionTopics";
@@ -130,11 +130,37 @@ const SPICY_BUILTIN_CATALOGUE: readonly QuestionPair[] = [
   ...ALL_MIXED_PAIRS,
 ];
 
-export function getBuiltinQuestionPairs(spicyMode: boolean, language: GameLanguage = "en"): readonly QuestionPair[] {
+function isPairInAllowedPools(pairId: string, allowedPools: ReadonlySet<string>): boolean {
+  if (pairId.startsWith("builtin-")) return allowedPools.has("classic");
+  const parts = pairId.split(":");
+  const prefix = parts[0];
+  if (prefix === "mix" || prefix === "wild" || prefix === "loc" || prefix === "locwild") {
+    return parts[1] ? allowedPools.has(parts[1]) : false;
+  }
+  if (prefix === "native") {
+    return parts[2] ? allowedPools.has(parts[2]) : false;
+  }
+  return false;
+}
+
+export function getBuiltinQuestionPairs(
+  spicyMode: boolean,
+  language: GameLanguage = "en",
+  enabledTopics?: readonly QuestionTopicId[],
+): readonly QuestionPair[] {
   const base = spicyMode ? SPICY_BUILTIN_CATALOGUE : FRIENDLY_BUILTIN_CATALOGUE;
-  if (language === "en") return base;
-  const localized = getLocalizedPairs(language, spicyMode);
-  return localized.length > 0 ? [...localized, ...base] : base;
+  const localized = language === "en" ? [] : getLocalizedPairs(language, spicyMode);
+  const all = localized.length > 0 ? [...localized, ...base] : base;
+  if (!enabledTopics || enabledTopics.length === 0) return all;
+
+  const topicSet = new Set(enabledTopics);
+  const allowedPools = new Set<string>();
+  for (const topic of QUESTION_TOPIC_LIST) {
+    if (topicSet.has(topic.id)) {
+      for (const pool of topic.pools) allowedPools.add(pool);
+    }
+  }
+  return all.filter((pair) => isPairInAllowedPools(pair.id, allowedPools));
 }
 
 export function getQuestionCatalog() {
