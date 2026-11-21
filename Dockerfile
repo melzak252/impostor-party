@@ -20,8 +20,10 @@ ENV NODE_ENV=production \
     PORT=3000 \
     DATABASE_PATH=/data/impostor.sqlite
 
-RUN mkdir -p /data
-COPY --from=builder /app/dist ./
+RUN mkdir -p /data && chown bun:bun /data
+COPY --chown=bun:bun --from=builder /app/dist ./
+
+USER bun
 
 EXPOSE 3000
 
