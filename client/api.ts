@@ -19,6 +19,7 @@ export interface SessionResponse {
 
 export interface PublicParty {
   code: string;
+  roomName?: string;
   hostName: string;
   playerCount: number;
   maxPlayers: 6;
@@ -69,6 +70,7 @@ const RoundSnapshotSchema = z.object({
 }).strict();
 const PartySnapshotSchema = z.object({
   code: z.string(),
+  roomName: z.string().optional(),
   version: z.number().int().nonnegative(),
   phase: PhaseSchema,
   hostId: z.string(),
@@ -88,6 +90,7 @@ const SessionResponseSchema = z.object({ currentPartyCode: z.string().nullable()
 const PublicPartyListSchema = z.object({
   parties: z.array(z.object({
     code: z.string(),
+    roomName: z.string().optional(),
     hostName: z.string(),
     playerCount: z.number().int().nonnegative(),
     maxPlayers: z.literal(6),
@@ -156,10 +159,16 @@ export async function listParties(): Promise<PublicParty[]> {
   return parsed.data.parties;
 }
 
-export async function createParty(name: string, visibility: "private" | "public", language?: GameLanguage): Promise<PartySnapshot> {
+export async function createParty(name: string, visibility: "private" | "public", language?: GameLanguage, roomName?: string): Promise<PartySnapshot> {
+  const trimmedRoom = roomName?.trim();
   const payload = await request("/api/parties", {
     method: "POST",
-    body: JSON.stringify({ name, visibility, ...(language ? { language } : {}) }),
+    body: JSON.stringify({
+      name,
+      visibility,
+      ...(language ? { language } : {}),
+      ...(trimmedRoom ? { roomName: trimmedRoom } : {}),
+    }),
   });
   return requireSnapshot(payload);
 }

@@ -20,6 +20,7 @@ const CreatePartyBodySchema = z.object({
   name: z.string(),
   visibility: z.enum(["private", "public"]),
   language: GameLanguageSchema.optional(),
+  roomName: z.string().optional(),
 }).strict();
 const JoinPartyBodySchema = z.object({ name: z.string() }).strict();
 
@@ -274,6 +275,35 @@ export async function createApp(options: AppOptions): Promise<{ url: string; clo
             return apiResponse(getQuestionCatalog());
           }
 
+          if (path === "/api/tts" && request.method === "GET") {
+            const rawLang = (url.searchParams.get("lang") ?? "en").trim().toLowerCase();
+            const allowedLangs = new Set(["en", "pl", "es", "de", "fr"]);
+            if (!allowedLangs.has(rawLang)) {
+              throw validationError();
+            }
+            const rawText = (url.searchParams.get("text") ?? "").trim().replace(/\s+/g, " ");
+            if (!rawText) {
+              throw validationError();
+            }
+            const clippedText = rawText.length > 200 ? rawText.slice(0, 200).trim() : rawText;
+            const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=${encodeURIComponent(rawLang)}&q=${encodeURIComponent(clippedText)}`;
+            const upstream = await fetch(ttsUrl, {
+              headers: { "User-Agent": "Mozilla/5.0" },
+              signal: AbortSignal.timeout(4000),
+            });
+            if (!upstream.ok) {
+              return new Response("TTS upstream unavailable", { status: 502 });
+            }
+            const audioBytes = await upstream.arrayBuffer();
+            return new Response(audioBytes, {
+              status: 200,
+              headers: {
+                "Content-Type": "audio/mpeg",
+                "Cache-Control": "public, max-age=86400",
+              },
+            });
+          }
+
           if (path === "/ws" && request.method === "GET") {
             if (!isAllowedOrigin(request, appOrigin, allowSameHostOrigin)) {
               throw new PartyError("FORBIDDEN", 403, "This connection must come from the configured application origin.");
@@ -323,7 +353,7 @@ export async function createApp(options: AppOptions): Promise<{ url: string; clo
             const body = parseBody(CreatePartyBodySchema, await readJsonBody(request));
             const token = sessionTokenFromCookie(request);
             if (!token) throw new PartyError("SESSION_REQUIRED", 401, "Create or resume a guest session first.");
-            const snapshot = parties.createParty(hashSessionToken(token), body.name, body.visibility, body.language);
+            const snapshot = parties.createParty(hashSessionToken(token), body.name, body.visibility, body.language, body.roomName);
             return apiResponse({ snapshot }, 201);
           }
 
@@ -366,6 +396,69 @@ export async function createApp(options: AppOptions): Promise<{ url: string; clo
               if (!token) throw new PartyError("SESSION_REQUIRED", 401, "Create or resume a guest session first.");
               return apiResponse({ snapshot: parties.getPartySnapshot(code, hashSessionToken(token)) });
             }
+          }
+
+          const devBotsRoute = /^\/api\/dev\/parties\/([^/]+)\/bots$/.exec(path);
+          if (devBotsRoute && request.method === "POST" && process.env.NODE_ENV !== "production") {
+            requireOrigin(request, appOrigin, allowSameHostOrigin);
+            const token = sessionTokenFromCookie(request);
+            if (!token) throw new PartyError("SESSION_REQUIRED", 401, "Create or resume a guest session first.");
+            const code = decodePartyCode(devBotsRoute[1]!);
+            const current = parties.getPartySnapshot(code, hashSessionToken(token));
+            const botNames = ["Bot Bartek", "Bot Kasia", "Bot Tomek"];
+            const botAnswers = ["7", "Shrek", "Pierogi", "Batman", "42", "Minecraft"];
+            const spots = Math.max(0, Math.min(3, 6 - current.players.length));
+            for (let i = 0; i < spots; i += 1) {
+              const botSession = parties.createSession();
+              const botHash = hashSessionToken(botSession.token);
+              parties.joinParty(code, botHash, botNames[i] ?? `Bot ${i + 1}`);
+              const wsUrl = new URL(`/ws?code=${encodeURIComponent(code)}`, server.url);
+              wsUrl.protocol = "ws:";
+              const botSocket = new (WebSocket as unknown as {
+                new (url: string | URL, opts: { headers: Record<string, string> }): WebSocket;
+              })(wsUrl, {
+                headers: {
+                  Cookie: `impostor_session=${botSession.token}`,
+                  Origin: server.url.origin,
+                },
+              });
+              let lastActionKey = "";
+              botSocket.addEventListener("message", (event) => {
+                if (typeof event.data !== "string") return;
+                let parsed: { type?: string; snapshot?: any };
+                try { parsed = JSON.parse(event.data); } catch { return; }
+                if (parsed.type === "removed") { botSocket.close(); return; }
+                const snap = parsed.snapshot;
+                if (!snap || !snap.round) return;
+                const me = snap.players?.find((p: any) => p.id === snap.selfId);
+                if (!me) return;
+                let action: unknown = null;
+                if (snap.phase === "answering" && !me.hasAnswered) {
+                  action = { type: "submit_answer", answer: botAnswers[(i + snap.round.number) % botAnswers.length]! };
+                } else if (snap.phase === "answers" && snap.settings?.questionRevealMode === "ready" && !me.isReady) {
+                  action = { type: "set_ready", ready: true };
+                } else if (snap.phase === "question" && !me.isReady) {
+                  action = { type: "set_ready", ready: true };
+                } else if (snap.phase === "voting" && snap.round.myVote === null) {
+                  const others = snap.round.participants.filter((p: any) => p.id !== snap.selfId);
+                  if (others.length > 0) action = { type: "vote", targetPlayerId: others[i % others.length].id };
+                }
+                if (!action) return;
+                const key = `${snap.round.id}:${snap.phase}`;
+                if (lastActionKey === key) return;
+                lastActionKey = key;
+                setTimeout(() => {
+                  try {
+                    parties.applyAction(code, botHash, {
+                      expectedPhase: snap.phase,
+                      roundId: snap.round.id,
+                      action: action as any,
+                    });
+                  } catch {}
+                }, 450 + i * 200);
+              });
+            }
+            return apiResponse({ snapshot: parties.getPartySnapshot(code, hashSessionToken(token)) });
           }
 
           if (path.startsWith("/api/")) return apiErrorResponse(new PartyError("PARTY_NOT_FOUND", 404, "API route not found."));

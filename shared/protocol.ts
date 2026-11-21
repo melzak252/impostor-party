@@ -69,6 +69,7 @@ export type QuestionPair = z.infer<typeof QuestionPairSchema>;
 const actionSchemas = [
   z.object({ type: z.literal("set_color"), colorId: ColorIdSchema }).strict(),
   z.object({ type: z.literal("set_settings"), settings: PartySettingsSchema }).strict(),
+  z.object({ type: z.literal("set_room_name"), roomName: z.string() }).strict(),
   z.object({ type: z.literal("kick"), playerId: z.string().uuid() }).strict(),
   z.object({ type: z.literal("leave") }).strict(),
   z.object({ type: z.literal("add_question"), normalQuestion: z.string(), impostorQuestion: z.string() }).strict(),
@@ -93,7 +94,7 @@ export interface RoundSnapshot {
   answers?: Record<string, string>; normalQuestion?: string; impostorQuestion?: string; impostorId?: string; votes?: Record<string, string>;
 }
 export interface PartySnapshot {
-  code: string; version: number; phase: Phase; hostId: string; selfId: string; settings: PartySettings;
+  code: string; roomName?: string; version: number; phase: Phase; hostId: string; selfId: string; settings: PartySettings;
   players: PlayerSnapshot[]; round: RoundSnapshot | null; notice: { type: "round_cancelled"; playerName: string } | null;
   customQuestions?: QuestionPair[];
 }

@@ -8,6 +8,7 @@ const PlayerNameSchema = z.string().min(1).max(80).refine((name) => Array.from(n
 const PartyDocumentSchema = z.object({
   id: z.string().uuid(),
   code: z.string().regex(/^[A-HJ-NP-Z2-9]{6}$/),
+  roomName: z.string().min(1).max(32).optional(),
   version: z.number().int().positive(),
   createdAt: z.number().finite(),
   updatedAt: z.number().finite(),

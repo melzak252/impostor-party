@@ -7,7 +7,7 @@ export interface RoundState {
   readyPlayerIds: string[]; votes: Record<string, string>; questionRevealAt: number | null;
 }
 export interface PartyState {
-  id: string; code: string; version: number; createdAt: number; updatedAt: number; hostId: string; phase: Phase;
+  id: string; code: string; roomName?: string; version: number; createdAt: number; updatedAt: number; hostId: string; phase: Phase;
   settings: PartySettings; players: PlayerState[]; customQuestions: Array<{ id: string; normalQuestion: string; impostorQuestion: string }>;
   usedQuestionIds: string[]; lastRoundNumber: number; round: RoundState | null;
   bannedSessionHashes: string[]; notice: { type: "round_cancelled"; playerName: string } | null;

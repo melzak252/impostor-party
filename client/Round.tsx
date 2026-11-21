@@ -1,18 +1,86 @@
-import { useEffect, useState, type CSSProperties, type FormEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type FormEvent } from "react";
 import { COLOR_PALETTE, type PartySnapshot } from "../shared/protocol";
 import type { PartyAction } from "./api";
 import { getStrings, useLanguage } from "./i18n";
 import type { UsePartyResult } from "./useParty";
 import { PlayerFace } from "./PlayerFace";
+import { pitchForParticipantIndex, speakText, stopSpeaking, useTtsEnabled } from "./tts";
 
 type ActiveRound = NonNullable<PartySnapshot["round"]>;
 type RoundParticipant = ActiveRound["participants"][number];
 const QUESTION_DRAW_DURATION_MS = 1_600;
-const ANSWER_REVEAL_STEP_MS = 1_000;
+const ANSWER_REVEAL_STEP_MS = 2_000;
+const ANSWER_REVEAL_STEP_SECONDS = ANSWER_REVEAL_STEP_MS / 1_000;
 
 function playerColor(colorId: RoundParticipant["colorId"]): CSSProperties {
   const swatch = COLOR_PALETTE.find((color) => color.id === colorId)?.swatch ?? "#898d97";
   return { "--player-color": swatch } as CSSProperties;
+}
+
+function FittedAnswerText({ text }: { text: string }) {
+  const boxRef = useRef<HTMLSpanElement>(null);
+  const textRef = useRef<HTMLSpanElement>(null);
+
+  useLayoutEffect(() => {
+    const box = boxRef.current;
+    const textEl = textRef.current;
+    if (!box || !textEl) return;
+
+    let cancelled = false;
+
+    const fit = () => {
+      if (cancelled) return;
+      const styles = getComputedStyle(box);
+      const padX =
+        (Number.parseFloat(styles.paddingLeft) || 0) +
+        (Number.parseFloat(styles.paddingRight) || 0);
+      const padY =
+        (Number.parseFloat(styles.paddingTop) || 0) +
+        (Number.parseFloat(styles.paddingBottom) || 0);
+      const availWidth = box.clientWidth - padX;
+      const availHeight = box.clientHeight - padY;
+      if (availWidth <= 0 || availHeight <= 0) return;
+
+      const minSize = 11;
+      const maxSize = Math.max(minSize, Math.min(120, Math.floor(availHeight * 0.9)));
+      let low = minSize;
+      let high = maxSize;
+      let best = minSize;
+
+      while (low <= high) {
+        const mid = Math.floor((low + high) / 2);
+        textEl.style.fontSize = `${mid}px`;
+        if (textEl.scrollWidth <= availWidth + 1 && textEl.scrollHeight <= availHeight + 1) {
+          best = mid;
+          low = mid + 1;
+        } else {
+          high = mid - 1;
+        }
+      }
+
+      textEl.style.fontSize = `${best}px`;
+    };
+
+    fit();
+
+    const observer =
+      typeof ResizeObserver !== "undefined" ? new ResizeObserver(() => fit()) : null;
+    observer?.observe(box);
+    void document.fonts?.ready.then(() => fit());
+
+    return () => {
+      cancelled = true;
+      observer?.disconnect();
+    };
+  }, [text]);
+
+  return (
+    <span className="round-answer-value" ref={boxRef}>
+      <span className="round-answer-value-text" ref={textRef}>
+        {text}
+      </span>
+    </span>
+  );
 }
 
 function AnswerList({
@@ -21,6 +89,7 @@ function AnswerList({
   hostId,
   reveal = false,
   revealedCount = 0,
+  revealStepRemainder = 0,
   statusForPlayer,
   selectedVote,
   voteDisabled = false,
@@ -33,6 +102,7 @@ function AnswerList({
   hostId: string;
   reveal?: boolean;
   revealedCount?: number;
+  revealStepRemainder?: number;
   statusForPlayer?: (participantId: string) => string | null;
   selectedVote?: string | null;
   voteDisabled?: boolean;
@@ -49,7 +119,10 @@ function AnswerList({
         const isImpostor = Boolean(impostorId && participant.id === impostorId);
         const voters = votersByTarget?.get(participant.id);
         const isRevealed = !reveal || index < revealedCount;
-        const flipCountdown = Math.max(1, index - revealedCount + 1);
+        const flipCountdown = Math.max(
+          1,
+          (index - revealedCount + 1) * ANSWER_REVEAL_STEP_SECONDS - revealStepRemainder,
+        );
         const faceMood = selected || isImpostor ? "sus" : "default";
         const status = statusForPlayer?.(participant.id);
         const answerCard = (
@@ -67,9 +140,7 @@ function AnswerList({
               </span>
               {isImpostor && <span className="impostor-badge">{t.round.impostorBadge}</span>}
             </span>
-            <span className="round-answer-value">
-              {round.answers?.[participant.id] ?? t.round.answerUnavailable}
-            </span>
+            <FittedAnswerText text={round.answers?.[participant.id] ?? t.round.answerUnavailable} />
             {status && <span className="round-answer-status">{status}</span>}
           </>
         );
@@ -183,7 +254,10 @@ export function Round({
 }) {
   const [lang] = useLanguage();
   const t = getStrings(lang);
+  const [ttsEnabled] = useTtsEnabled();
+  const lastSpokenKeyRef = useRef<string | null>(null);
   const round = snapshot.round;
+  const speechLang = snapshot.settings.language ?? lang;
   const [answerState, setAnswerState] = useState(() => ({
     roundId: round?.id ?? null,
     value: round?.myAnswer ?? "",
@@ -191,7 +265,11 @@ export function Round({
   const [selectedVote, setSelectedVote] = useState<string | null>(null);
   const [countdownNow, setCountdownNow] = useState(() => Date.now());
   const [questionDrawnRoundId, setQuestionDrawnRoundId] = useState<string | null>(null);
-  const [answerReveal, setAnswerReveal] = useState({ roundId: null as string | null, count: 0 });
+  const [answerReveal, setAnswerReveal] = useState({
+    roundId: null as string | null,
+    count: 0,
+    stepRemainder: 0,
+  });
   const answerDraft =
     answerState.roundId === (round?.id ?? null) ? answerState.value : round?.myAnswer ?? "";
 
@@ -236,25 +314,77 @@ export function Round({
 
   useEffect(() => {
     if (!round || snapshot.phase !== "answers") {
-      setAnswerReveal({ roundId: round?.id ?? null, count: 0 });
+      setAnswerReveal({ roundId: round?.id ?? null, count: 0, stepRemainder: 0 });
       return;
     }
 
     const total = round.participants.length;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      setAnswerReveal({ roundId: round.id, count: total });
+      setAnswerReveal({ roundId: round.id, count: total, stepRemainder: 0 });
       return;
     }
 
-    let count = 0;
-    setAnswerReveal({ roundId: round.id, count });
+    let elapsedSeconds = 0;
+    setAnswerReveal({ roundId: round.id, count: 0, stepRemainder: 0 });
     const timer = window.setInterval(() => {
-      count = Math.min(total, count + 1);
-      setAnswerReveal({ roundId: round.id, count });
+      elapsedSeconds += 1;
+      const count = Math.min(total, Math.floor(elapsedSeconds / ANSWER_REVEAL_STEP_SECONDS));
+      const stepRemainder = elapsedSeconds % ANSWER_REVEAL_STEP_SECONDS;
+      setAnswerReveal({ roundId: round.id, count, stepRemainder });
       if (count >= total) window.clearInterval(timer);
-    }, ANSWER_REVEAL_STEP_MS);
+    }, 1_000);
     return () => window.clearInterval(timer);
   }, [round?.id, round?.participants.length, snapshot.phase]);
+
+  useEffect(() => {
+    if (!ttsEnabled) {
+      stopSpeaking();
+    }
+  }, [ttsEnabled]);
+
+  useEffect(() => {
+    return () => stopSpeaking();
+  }, []);
+
+  useEffect(() => {
+    if (!ttsEnabled || !round) return;
+
+    if (
+      snapshot.phase === "answers" &&
+      answerReveal.roundId === round.id &&
+      answerReveal.count > 0
+    ) {
+      const revealedIndex = answerReveal.count - 1;
+      const participant = round.participants[revealedIndex];
+      const answerText = participant ? round.answers?.[participant.id] : undefined;
+      const key = `${round.id}:answer:${revealedIndex}`;
+      if (answerText && lastSpokenKeyRef.current !== key) {
+        lastSpokenKeyRef.current = key;
+        speakText(answerText, speechLang, {
+          pitch: pitchForParticipantIndex(revealedIndex),
+        });
+      }
+      return;
+    }
+
+    if (snapshot.phase === "question" && round.normalQuestion) {
+      const key = `${round.id}:question`;
+      if (lastSpokenKeyRef.current !== key) {
+        lastSpokenKeyRef.current = key;
+        speakText(round.normalQuestion, speechLang, {
+          interrupt: true,
+          pitch: 1.02,
+        });
+      }
+    }
+  }, [
+    answerReveal.count,
+    answerReveal.roundId,
+    round,
+    snapshot.phase,
+    speechLang,
+    ttsEnabled,
+  ]);
 
   if (!round || snapshot.phase === "lobby") {
     return (
@@ -673,6 +803,11 @@ export function Round({
                 snapshot.phase === "answers" && answerReveal.roundId === round.id
                   ? answerReveal.count
                   : roster.length
+              }
+              revealStepRemainder={
+                snapshot.phase === "answers" && answerReveal.roundId === round.id
+                  ? answerReveal.stepRemainder
+                  : 0
               }
               statusForPlayer={answerProgress}
               selectedVote={snapshot.phase === "voting" ? selectedVote : undefined}

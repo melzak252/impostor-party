@@ -12,6 +12,7 @@ import {
 } from "./i18n";
 import { PlayerFace } from "./PlayerFace";
 import { Round } from "./Round";
+import { isTtsSupported, useTtsEnabled } from "./tts";
 import { useParty, type UsePartyResult } from "./useParty";
 
 type PartySettingsWithLanguage = PartySettings & {
@@ -47,6 +48,29 @@ function LanguageSelect() {
         </option>
       ))}
     </select>
+  );
+}
+
+function VoiceToggle() {
+  const [lang] = useLanguage();
+  const t = getStrings(lang);
+  const [enabled, toggle] = useTtsEnabled();
+  if (!isTtsSupported()) return null;
+  return (
+    <button
+      type="button"
+      className={enabled ? "secondary" : "ghost"}
+      aria-pressed={enabled}
+      onClick={toggle}
+      style={{
+        minHeight: "34px",
+        padding: "4px 10px",
+        fontSize: "0.8125rem",
+        whiteSpace: "nowrap",
+      }}
+    >
+      {enabled ? `🔊 ${t.common.voiceOn}` : `🔇 ${t.common.voiceOff}`}
+    </button>
   );
 }
 
@@ -225,9 +249,22 @@ function PlayerTiles({
                 <strong>{player.name}{isSelf ? t.common.youSuffix : ""}</strong>
                 {isPlayerHost && <span className="host-tag">{t.lobby.hostTag}</span>}
               </div>
-              <span className={`presence ${player.connected ? "presence-online" : "presence-offline"}`}>
-                {player.connected ? t.common.online : t.common.offline}
-              </span>
+              <div className="player-tile-status">
+                <span className={`presence ${player.connected ? "presence-online" : "presence-offline"}`}>
+                  {player.connected ? t.common.online : t.common.offline}
+                </span>
+                {selfId === hostId && !isSelf && (
+                  <button
+                    className="kick-button"
+                    type="button"
+                    aria-label={t.lobby.removePlayerAria(player.name)}
+                    disabled={!connected || busy}
+                    onClick={() => onKick(player)}
+                  >
+                    {t.lobby.bootPlayer}
+                  </button>
+                )}
+              </div>
             </div>
 
             {isSelf && ownPlayer && colorEnabled && (
@@ -259,19 +296,6 @@ function PlayerTiles({
               </div>
             )}
 
-            {!isSelf && !isPlayerHost && <span className="player-role-note">{t.lobby.squadMember}</span>}
-
-            {selfId === hostId && !isSelf && (
-              <button
-                className="kick-button"
-                type="button"
-                aria-label={t.lobby.removePlayerAria(player.name)}
-                disabled={!connected || busy}
-                onClick={() => onKick(player)}
-              >
-                {t.lobby.bootPlayer}
-              </button>
-            )}
           </article>
         );
       })}
@@ -293,20 +317,42 @@ function SettingsPanel({
   onChange(settings: PartySettings): void;
 }) {
   const [lang, setLang] = useLanguage();
+  const [topicsOpen, setTopicsOpen] = useState(false);
+  const [draftTopics, setDraftTopics] = useState<QuestionTopicId[] | null>(null);
   const t = getStrings(lang);
   const currentGameLanguage = (settings as PartySettingsWithLanguage).language ?? "en";
   const rawEnabledTopics = (settings as PartySettingsWithLanguage).enabledTopics;
-  const activeTopics: QuestionTopicId[] =
+  const savedTopics: QuestionTopicId[] =
     rawEnabledTopics && rawEnabledTopics.length > 0 ? rawEnabledTopics : [...TOPIC_IDS];
+  const activeTopics = topicsOpen && draftTopics ? draftTopics : savedTopics;
   const update = (patch: Partial<PartySettingsWithLanguage>) =>
     onChange({ ...settings, ...patch } as PartySettings);
+
+  const openTopicsModal = () => {
+    setDraftTopics([...savedTopics]);
+    setTopicsOpen(true);
+  };
+
+  const closeTopicsModal = () => {
+    if (isHost && draftTopics) {
+      const changed =
+        draftTopics.length !== savedTopics.length ||
+        draftTopics.some((id, idx) => id !== savedTopics[idx]);
+      if (changed) update({ enabledTopics: draftTopics });
+    }
+    setTopicsOpen(false);
+    setDraftTopics(null);
+  };
+
   const toggleTopic = (topicId: QuestionTopicId) => {
-    const isActive = activeTopics.includes(topicId);
-    if (isActive && activeTopics.length <= 1) return;
+    if (!isHost) return;
+    const base = draftTopics ?? savedTopics;
+    const isActive = base.includes(topicId);
+    if (isActive && base.length <= 1) return;
     const nextTopics = TOPIC_IDS.filter((id) =>
-      isActive ? id !== topicId && activeTopics.includes(id) : id === topicId || activeTopics.includes(id),
+      isActive ? id !== topicId && base.includes(id) : id === topicId || base.includes(id),
     );
-    update({ enabledTopics: nextTopics });
+    setDraftTopics(nextTopics);
   };
 
   return (
@@ -422,38 +468,83 @@ function SettingsPanel({
           )}
         </div>
 
-        <div className="setting-row setting-row-topics">
+        <div className="setting-row setting-row-topics-trigger">
           <div>
             <strong>{t.lobby.topicsLabel}</strong>
             <span className="setting-description">{t.lobby.topicsDescription}</span>
           </div>
-          <div className="topic-chips" role={isHost ? "group" : undefined} aria-label={t.lobby.topicsLabel}>
-            {TOPIC_IDS.map((topicId) => {
-              const isActive = activeTopics.includes(topicId);
-              const isLastActive = isActive && activeTopics.length <= 1;
-              return isHost ? (
-                <button
-                  key={topicId}
-                  type="button"
-                  className={`topic-chip${isActive ? " is-active" : ""}`}
-                  aria-pressed={isActive}
-                  disabled={!connected || busy || isLastActive}
-                  onClick={() => toggleTopic(topicId)}
-                >
-                  {t.lobby.topics[topicId]}
-                </button>
-              ) : (
-                <span
-                  key={topicId}
-                  className={`topic-chip is-readonly${isActive ? " is-active" : ""}`}
-                >
-                  {t.lobby.topics[topicId]}
-                </span>
-              );
-            })}
-          </div>
+          <button
+            type="button"
+            className="secondary topics-open-button"
+            onClick={openTopicsModal}
+          >
+            {t.lobby.topicsLabel} ({savedTopics.length}/{TOPIC_IDS.length})
+          </button>
         </div>
       </div>
+
+      {topicsOpen && (
+        <div
+          className="topics-modal-backdrop"
+          role="dialog"
+          aria-modal="true"
+          aria-label={t.lobby.topicsLabel}
+          onClick={(event) => {
+            if (event.target === event.currentTarget) closeTopicsModal();
+          }}
+        >
+          <div className="card topics-modal">
+            <div className="topics-modal-header">
+              <div>
+                <p className="eyebrow">{t.lobby.houseRules}</p>
+                <h2>{t.lobby.topicsLabel} <span className="count-badge">{activeTopics.length}/{TOPIC_IDS.length}</span></h2>
+              </div>
+              <div className="button-row">
+                {isHost && activeTopics.length < TOPIC_IDS.length && (
+                  <button
+                    type="button"
+                    className="quiet-button"
+                    onClick={() => setDraftTopics([...TOPIC_IDS])}
+                  >
+                    All
+                  </button>
+                )}
+                <button type="button" className="primary" onClick={closeTopicsModal}>
+                  OK
+                </button>
+              </div>
+            </div>
+            <p className="muted small-copy">{t.lobby.topicsDescription}</p>
+            <div className="topics-modal-grid" role={isHost ? "group" : undefined} aria-label={t.lobby.topicsLabel}>
+              {TOPIC_IDS.map((topicId) => {
+                const isActive = activeTopics.includes(topicId);
+                const isLastActive = isActive && activeTopics.length <= 1;
+                return isHost ? (
+                  <button
+                    key={topicId}
+                    type="button"
+                    className={`topic-box${isActive ? " is-active" : ""}`}
+                    aria-pressed={isActive}
+                    disabled={isLastActive}
+                    onClick={() => toggleTopic(topicId)}
+                  >
+                    <span className="topic-box-name">{t.lobby.topics[topicId]}</span>
+                    <span className="topic-box-state">{isActive ? "✓" : "—"}</span>
+                  </button>
+                ) : (
+                  <div
+                    key={topicId}
+                    className={`topic-box is-readonly${isActive ? " is-active" : ""}`}
+                  >
+                    <span className="topic-box-name">{t.lobby.topics[topicId]}</span>
+                    <span className="topic-box-state">{isActive ? "✓" : "—"}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }
@@ -512,6 +603,27 @@ function LobbyView({
     void act({ type: "start_round" });
   };
 
+  const [spawningBots, setSpawningBots] = useState(false);
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [draftTitle, setDraftTitle] = useState(snapshot.roomName ?? "");
+  const isLocalDev =
+    typeof window !== "undefined" &&
+    /^(localhost|127\.0\.0\.1|192\.168\.|10\.)/.test(window.location.hostname);
+
+  const spawnTestBots = async () => {
+    if (!isHost || !connected || busy || spawningBots) return;
+    setSpawningBots(true);
+    clearError();
+    try {
+      await fetch(`/api/dev/parties/${snapshot.code}/bots`, {
+        method: "POST",
+        credentials: "same-origin",
+      });
+    } finally {
+      setSpawningBots(false);
+    }
+  };
+
   const roundInProgress = snapshot.phase !== "lobby";
 
   return (
@@ -523,6 +635,7 @@ function LobbyView({
             <span>{t.common.brand}</span>
           </Link>
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <VoiceToggle />
             <LanguageSelect />
             <ConnectionStatus connected={connected} removed={Boolean(removedReason)} />
           </div>
@@ -533,7 +646,58 @@ function LobbyView({
           <section className="party-heading">
             <div>
               <p className="eyebrow">{snapshot.settings.visibility === "private" ? t.lobby.privateRoom : t.lobby.publicRoom}</p>
-              <h1 className="party-title">{t.lobby.waitingRoom}</h1>
+              {isHost && editingTitle ? (
+                <form
+                  className="party-title-edit"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    clearError();
+                    void act({ type: "set_room_name", roomName: draftTitle });
+                    setEditingTitle(false);
+                  }}
+                >
+                  <input
+                    autoFocus
+                    aria-label="Room name"
+                    maxLength={32}
+                    value={draftTitle}
+                    onChange={(event) => setDraftTitle(event.target.value)}
+                    placeholder={t.lobby.waitingRoom}
+                    disabled={!connected || busy}
+                  />
+                  <button type="submit" className="primary" disabled={!connected || busy}>
+                    Save
+                  </button>
+                  <button
+                    type="button"
+                    className="secondary"
+                    onClick={() => {
+                      setDraftTitle(snapshot.roomName ?? "");
+                      setEditingTitle(false);
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </form>
+              ) : (
+                <div className="party-title-row">
+                  <h1 className="party-title">{snapshot.roomName || t.lobby.waitingRoom}</h1>
+                  {isHost && (
+                    <button
+                      type="button"
+                      className="party-title-edit-btn"
+                      aria-label="Edit room name"
+                      disabled={!connected || busy}
+                      onClick={() => {
+                        setDraftTitle(snapshot.roomName ?? "");
+                        setEditingTitle(true);
+                      }}
+                    >
+                      ✎
+                    </button>
+                  )}
+                </div>
+              )}
               <p className="party-subtitle">
                 {t.lobby.hostedBy(host?.name ?? t.lobby.aPlayer, snapshot.players.length)}
               </p>
@@ -605,6 +769,16 @@ function LobbyView({
               onChange={updateSettings}
             />
             <div className="lobby-actions">
+              {isLocalDev && isHost && snapshot.players.length < 4 && (
+                <button
+                  className="secondary"
+                  type="button"
+                  disabled={!connected || busy || spawningBots}
+                  onClick={() => void spawnTestBots()}
+                >
+                  {spawningBots ? "Spawning..." : "+3 test bots"}
+                </button>
+              )}
               {isHost && (
                 <button className="primary" type="button" disabled={!connected || busy} onClick={startRound}>
                   {t.lobby.startRound}

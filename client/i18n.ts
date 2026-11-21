@@ -90,6 +90,8 @@ export interface TranslationStrings {
   common: {
     brand: string;
     languageLabel: string;
+    voiceOn: string;
+    voiceOff: string;
     tryAgain: string;
     retry: string;
     retryConnection: string;
@@ -349,6 +351,8 @@ const en: TranslationStrings = {
   common: {
     brand: "Impostor Party",
     languageLabel: "Language",
+    voiceOn: "Voice on",
+    voiceOff: "Voice off",
     tryAgain: "Try again",
     retry: "Retry",
     retryConnection: "Retry connection",
@@ -612,7 +616,7 @@ const en: TranslationStrings = {
     allCardsFlipped: "All cards flipped!",
     flippingCardOf: (current, total) => `Flipping card ${current} of ${total}…`,
     readyForRealQ: "Ready for the real question",
-    oneCardPerSec: "1 card / sec",
+    oneCardPerSec: "1 card / 2 sec",
     votingInstruction: "Pick the player you think had the fake prompt, then lock in your vote.",
     skipRerollRound: "Skip / Reroll round",
     nextRound: "Next round",
@@ -624,6 +628,8 @@ const pl: TranslationStrings = {
   common: {
     brand: "Impostor Party",
     languageLabel: "Język",
+    voiceOn: "Głos wł.",
+    voiceOff: "Głos wył.",
     tryAgain: "Spróbuj ponownie",
     retry: "Ponów",
     retryConnection: "Ponów połączenie",
@@ -886,7 +892,7 @@ const pl: TranslationStrings = {
     allCardsFlipped: "Wszystkie karty odkryte!",
     flippingCardOf: (current, total) => `Odkrywanie karty ${current} z ${total}…`,
     readyForRealQ: "Gotowi na prawdziwe pytanie",
-    oneCardPerSec: "1 karta / s",
+    oneCardPerSec: "1 karta / 2 s",
     votingInstruction: "Wybierz gracza, który Twoim zdaniem miał inne pytanie, i zatwierdź głos.",
     skipRerollRound: "Pomiń / Nowa runda",
     nextRound: "Następna runda",
@@ -898,6 +904,8 @@ const es: TranslationStrings = {
   common: {
     brand: "Impostor Party",
     languageLabel: "Idioma",
+    voiceOn: "Voz sí",
+    voiceOff: "Voz no",
     tryAgain: "Intentar de nuevo",
     retry: "Reintentar",
     retryConnection: "Reintentar conexión",
@@ -1160,7 +1168,7 @@ const es: TranslationStrings = {
     allCardsFlipped: "¡Todas las cartas reveladas!",
     flippingCardOf: (current, total) => `Revelando carta ${current} de ${total}…`,
     readyForRealQ: "Listos para la pregunta real",
-    oneCardPerSec: "1 carta / seg",
+    oneCardPerSec: "1 carta / 2 seg",
     votingInstruction: "Elige al jugador que crees que tuvo la pregunta falsa y confirma tu voto.",
     skipRerollRound: "Saltar / Repetir ronda",
     nextRound: "Siguiente ronda",
@@ -1172,6 +1180,8 @@ const de: TranslationStrings = {
   common: {
     brand: "Impostor Party",
     languageLabel: "Sprache",
+    voiceOn: "Stimme an",
+    voiceOff: "Stimme aus",
     tryAgain: "Erneut versuchen",
     retry: "Wiederholen",
     retryConnection: "Verbindung wiederholen",
@@ -1434,7 +1444,7 @@ const de: TranslationStrings = {
     allCardsFlipped: "Alle Karten aufgedeckt!",
     flippingCardOf: (current, total) => `Decke Karte ${current} von ${total} auf…`,
     readyForRealQ: "Bereit für die echte Frage",
-    oneCardPerSec: "1 Karte / Sek.",
+    oneCardPerSec: "1 Karte / 2 Sek.",
     votingInstruction: "Wähle die Person, die vermutlich die falsche Frage hatte, und gib deine Stimme ab.",
     skipRerollRound: "Runde überspringen",
     nextRound: "Nächste Runde",
@@ -1446,6 +1456,8 @@ const fr: TranslationStrings = {
   common: {
     brand: "Impostor Party",
     languageLabel: "Langue",
+    voiceOn: "Voix on",
+    voiceOff: "Voix off",
     tryAgain: "Réessayer",
     retry: "Réessayer",
     retryConnection: "Relancer la connexion",
@@ -1708,7 +1720,7 @@ const fr: TranslationStrings = {
     allCardsFlipped: "Toutes les cartes sont révélées !",
     flippingCardOf: (current, total) => `Révélation de la carte ${current} sur ${total}…`,
     readyForRealQ: "Prêts pour la vraie question",
-    oneCardPerSec: "1 carte / sec",
+    oneCardPerSec: "1 carte / 2 sec",
     votingInstruction: "Choisis la personne qui avait selon toi la fausse question, puis confirme ton vote.",
     skipRerollRound: "Passer / Relancer",
     nextRound: "Manche suivante",

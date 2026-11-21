@@ -7,6 +7,7 @@ export function projectParty(state: PartyState, viewerId: string, connectedIds: 
 
   const snapshot: PartySnapshot = {
     code: state.code,
+    ...(state.roomName ? { roomName: state.roomName } : {}),
     version: state.version,
     phase: state.phase,
     hostId: state.hostId,

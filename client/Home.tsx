@@ -63,7 +63,6 @@ export function Home() {
   const [listLoading, setListLoading] = useState(true);
   const [listError, setListError] = useState<string | null>(null);
   const [name, setName] = useState("");
-  const [visibility, setVisibility] = useState<"private" | "public">("private");
   const [inviteCode, setInviteCode] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -144,7 +143,7 @@ export function Home() {
     setBusy(true);
     setMessage(null);
     try {
-      const snapshot = await createParty(playerName, visibility, lang);
+      const snapshot = await createParty(playerName, "private", lang);
       navigate(`/party/${snapshot.code}`);
     } catch (error) {
       setMessage(describeApiError(error));
@@ -293,31 +292,17 @@ export function Home() {
             <span className="sticker-badge sticker-badge--mint">{t.home.hostBadge}</span>
           </div>
           <form onSubmit={(event) => void handleCreate(event)}>
-            <div className="form-fields-row">
-              <div className="field-stack">
-                <label className="field-label" htmlFor="home-name">{t.home.yourNickname}</label>
-                <input
-                  id="home-name"
-                  autoComplete="nickname"
-                  maxLength={20}
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
-                  placeholder={t.home.nicknamePlaceholder}
-                  disabled={busy}
-                />
-              </div>
-              <div className="field-stack">
-                <label className="field-label" htmlFor="party-visibility">{t.home.whoCanFindIt}</label>
-                <select
-                  id="party-visibility"
-                  value={visibility}
-                  onChange={(event) => setVisibility(event.target.value as "private" | "public")}
-                  disabled={busy}
-                >
-                  <option value="private">{t.home.visibilityPrivateOption}</option>
-                  <option value="public">{t.home.visibilityPublicOption}</option>
-                </select>
-              </div>
+            <div className="field-stack">
+              <label className="field-label" htmlFor="home-name">{t.home.yourNickname}</label>
+              <input
+                id="home-name"
+                autoComplete="nickname"
+                maxLength={20}
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                placeholder={t.home.nicknamePlaceholder}
+                disabled={busy}
+              />
             </div>
             <button
               className="primary full-button"
@@ -388,8 +373,8 @@ export function Home() {
             {parties.map((party) => (
               <li className="public-party" key={party.code}>
                 <div>
-                  <strong>{t.home.hostRoom(party.hostName)}</strong>
-                  <span>{t.home.roomMeta(party.code, party.playerCount, party.maxPlayers)}</span>
+                  <strong>{party.roomName ?? t.home.hostRoom(party.hostName)}</strong>
+                  <span>{party.roomName ? `${party.hostName} · ` : ""}{t.home.roomMeta(party.code, party.playerCount, party.maxPlayers)}</span>
                 </div>
                 {currentCode === party.code
                   ? <Link className="secondary link-button" to={`/party/${party.code}`}>{t.home.returnShort}</Link>

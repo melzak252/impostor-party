@@ -39,6 +39,7 @@ export class PartyError extends Error {
 type MembershipPartyAction =
   | Extract<PartyAction, { type: "set_color" }>
   | Extract<PartyAction, { type: "set_settings" }>
+  | Extract<PartyAction, { type: "set_room_name" }>
   | Extract<PartyAction, { type: "kick" }>
   | Extract<PartyAction, { type: "leave" }>;
 export type DeferredPartyAction = Exclude<PartyAction, MembershipPartyAction>;
@@ -107,6 +108,16 @@ export function normalizePlayerName(input: string): string {
     throw apiError("VALIDATION_ERROR", 400, "Name must be between 1 and 20 characters.");
   }
   return name;
+}
+
+export function normalizeRoomName(input?: string): string | undefined {
+  if (input === undefined) return undefined;
+  const trimmed = input.trim();
+  if (!trimmed) return undefined;
+  if (Array.from(trimmed).length > 32) {
+    throw apiError("VALIDATION_ERROR", 400, "Room name must be 32 characters or fewer.");
+  }
+  return trimmed;
 }
 
 function isCodeUniqueCollision(error: unknown): boolean {
@@ -219,18 +230,19 @@ export class PartyService {
     return Boolean(session && session.expiresAt > this.now());
   }
 
-  listPublicParties(): Array<{ code: string; hostName: string; playerCount: number; maxPlayers: number }> {
+  listPublicParties(): Array<{ code: string; roomName?: string; hostName: string; playerCount: number; maxPlayers: number }> {
     this.maintenance();
     return this.store.listParties().flatMap((state) => {
       if (state.settings.visibility !== "public" || state.phase !== "lobby" || state.players.length >= MAX_PLAYERS) return [];
       const host = state.players.find((player) => player.id === state.hostId);
       if (!host || !this.connectedIds(state.id).has(host.id)) return [];
-      return [{ code: state.code, hostName: host.name, playerCount: state.players.length, maxPlayers: MAX_PLAYERS }];
+      return [{ code: state.code, ...(state.roomName ? { roomName: state.roomName } : {}), hostName: host.name, playerCount: state.players.length, maxPlayers: MAX_PLAYERS }];
     });
   }
 
-  createParty(sessionHash: string, rawName: string, visibility: "private" | "public", language?: GameLanguage): PartySnapshot {
+  createParty(sessionHash: string, rawName: string, visibility: "private" | "public", language?: GameLanguage, rawRoomName?: string): PartySnapshot {
     const name = normalizePlayerName(rawName);
+    const roomName = normalizeRoomName(rawRoomName);
     this.maintenance();
     const now = this.now();
 
@@ -256,6 +268,7 @@ export class PartyService {
           const state: PartyState = {
             id: randomUUID(),
             code,
+            ...(roomName ? { roomName } : {}),
             version: 1,
             createdAt: now,
             updatedAt: now,
@@ -420,6 +433,21 @@ export class PartyService {
         if (taken) throw apiError("COLOR_TAKEN", 409, "That colour is already taken.");
         if (actor.colorId !== action.colorId) {
           actor.colorId = action.colorId;
+          state.version += 1;
+          state.updatedAt = now;
+          this.store.saveParty(state);
+          return { kind: "changed" as const, partyId: state.id, snapshot: projectParty(state, actor.id, this.connectedIds(state.id)) };
+        }
+        return { kind: "unchanged" as const, partyId: state.id, snapshot: projectParty(state, actor.id, this.connectedIds(state.id)) };
+      }
+
+      if (action.type === "set_room_name") {
+        if (actor.id !== state.hostId) throw apiError("FORBIDDEN", 403, "Only the host can change the room name.");
+        if (state.phase !== "lobby") throw apiError("FORBIDDEN", 403, "Room name can only be changed in the lobby.");
+        const nextRoomName = normalizeRoomName(action.roomName);
+        if ((state.roomName ?? undefined) !== nextRoomName) {
+          if (nextRoomName) state.roomName = nextRoomName;
+          else delete state.roomName;
           state.version += 1;
           state.updatedAt = now;
           this.store.saveParty(state);
