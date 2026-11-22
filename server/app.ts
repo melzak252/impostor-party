@@ -30,6 +30,18 @@ const CreatePartyBodySchema = z.object({
   roomName: z.string().optional(),
 }).strict();
 const JoinPartyBodySchema = z.object({ name: z.string() }).strict();
+const QuestionReviewBodySchema = z.object({
+  action: z.enum(["edit", "delete", "clear"]),
+  note: z.string().max(500),
+  text: z.string().max(300),
+}).strict();
+
+interface QuestionReviewEntry {
+  action: "edit" | "delete";
+  note: string;
+  text: string;
+  updatedAt: number;
+}
 
 export interface AppOptions {
   port: number;
@@ -301,6 +313,42 @@ export async function createApp(options: AppOptions): Promise<{ url: string; clo
 
           if (path === "/api/questions" && request.method === "GET") {
             return apiResponse(getQuestionCatalog());
+          }
+
+          const devReviewsEnabled = process.env.NODE_ENV !== "production";
+          const reviewsFilePath = join(dirname(options.dbPath), "question-reviews.json");
+          if (path === "/api/dev/question-reviews" && request.method === "GET") {
+            if (!devReviewsEnabled) return apiResponse({ enabled: false, reviews: {} });
+            const file = Bun.file(reviewsFilePath);
+            const reviews = (await file.exists())
+              ? (await file.json() as Record<string, QuestionReviewEntry>)
+              : {};
+            return apiResponse({ enabled: true, reviews });
+          }
+
+          const devReviewMatch = /^\/api\/dev\/question-reviews\/([A-Za-z0-9_.:-]+)$/.exec(path);
+          if (devReviewMatch && request.method === "PUT") {
+            if (!devReviewsEnabled) throw new PartyError("FORBIDDEN", 403, "Review mode is only available in development.");
+            requireOrigin(request, appOrigin, allowSameHostOrigin);
+            const body = parseBody(QuestionReviewBodySchema, await readJsonBody(request));
+            const file = Bun.file(reviewsFilePath);
+            const reviews: Record<string, QuestionReviewEntry> = (await file.exists())
+              ? (await file.json() as Record<string, QuestionReviewEntry>)
+              : {};
+            const qid = decodeURIComponent(devReviewMatch[1]!);
+            if (body.action === "clear") {
+              delete reviews[qid];
+            } else {
+              reviews[qid] = {
+                action: body.action,
+                note: body.note.trim(),
+                text: body.text,
+                updatedAt: now(),
+              };
+            }
+            await mkdir(dirname(reviewsFilePath), { recursive: true });
+            await Bun.write(reviewsFilePath, JSON.stringify(reviews, null, 2));
+            return apiResponse({ enabled: true, reviews });
           }
 
           if (path === "/api/suggestions" && request.method === "POST") {

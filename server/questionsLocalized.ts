@@ -47,7 +47,7 @@ const LOCALIZED_ITEMS: readonly LocalizedPoolItem[] = [
     language: "pl",
     pool: "pl_food",
     angle: "pos",
-    text: "Ulubiony smak pierogów, który nigdy się nie nudzi?",
+    text: "Ulubiony farsz do pierogów, który nigdy się nie nudzi?",
   },
   {
     id: "pl-food-03",
@@ -140,7 +140,7 @@ const LOCALIZED_ITEMS: readonly LocalizedPoolItem[] = [
     language: "pl",
     pool: "pl_places",
     angle: "neg",
-    text: "Gdzie w Polsce korki i parawany doprowadzają Cię do szału?",
+    text: "Gdzie w Polsce korki i parawany doprowadzają cię do szału?",
   },
   {
     id: "pl-places-06",

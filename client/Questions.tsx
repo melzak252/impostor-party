@@ -25,6 +25,13 @@ interface QuestionsCatalogResponse {
   questions: TrackedQuestion[];
 }
 
+interface QuestionReviewEntry {
+  action: "edit" | "delete";
+  note: string;
+  text: string;
+  updatedAt: number;
+}
+
 const POOL_TO_TOPIC: Readonly<Record<string, QuestionTopicId>> = Object.fromEntries(
   QUESTION_TOPIC_LIST.flatMap((topic) => topic.pools.map((pool) => [pool, topic.id])),
 );
@@ -67,6 +74,12 @@ export function QuestionsPage() {
 
   // Admin moderation state
   const [adminOpen, setAdminOpen] = useState(false);
+
+  // Local dev question review state
+  const [reviewsEnabled, setReviewsEnabled] = useState(false);
+  const [reviews, setReviews] = useState<Record<string, QuestionReviewEntry>>({});
+  const [draftNotes, setDraftNotes] = useState<Record<string, string>>({});
+  const [reviewFilter, setReviewFilter] = useState<"all" | "marked" | "edit" | "delete">("all");
   const [adminToken, setAdminToken] = useState(() => {
     try {
       return sessionStorage.getItem(ADMIN_TOKEN_KEY) ?? "";
@@ -94,6 +107,44 @@ export function QuestionsPage() {
   useEffect(() => {
     void loadQuestions();
   }, [loadQuestions]);
+
+  useEffect(() => {
+    fetch("/api/dev/question-reviews")
+      .then(async (res) => (res.ok ? ((await res.json()) as { enabled: boolean; reviews: Record<string, QuestionReviewEntry> }) : null))
+      .then((payload) => {
+        if (!payload?.enabled) return;
+        setReviewsEnabled(true);
+        setReviews(payload.reviews);
+        const notes: Record<string, string> = {};
+        for (const [id, entry] of Object.entries(payload.reviews)) notes[id] = entry.note;
+        setDraftNotes(notes);
+      })
+      .catch(() => {
+        // Ignore when unavailable
+      });
+  }, []);
+
+  const saveReview = useCallback(async (q: TrackedQuestion, action: "edit" | "delete" | "clear", note: string) => {
+    try {
+      const res = await fetch(`/api/dev/question-reviews/${encodeURIComponent(q.id)}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, note, text: q.text }),
+      });
+      if (!res.ok) return;
+      const payload = (await res.json()) as { enabled: boolean; reviews: Record<string, QuestionReviewEntry> };
+      setReviews(payload.reviews);
+      if (action === "clear") {
+        setDraftNotes((prev) => {
+          const next = { ...prev };
+          delete next[q.id];
+          return next;
+        });
+      }
+    } catch {
+      // Ignore transient errors
+    }
+  }, []);
 
   useEffect(() => {
     setSuggestLang(lang);
@@ -138,9 +189,25 @@ export function QuestionsPage() {
     return baseFiltered.filter((q) => {
       if (topic !== "all" && POOL_TO_TOPIC[q.pool] !== topic) return false;
       if (pool !== "all" && q.pool !== pool) return false;
+      if (reviewsEnabled && reviewFilter !== "all") {
+        const entry = reviews[q.id];
+        if (reviewFilter === "marked" && !entry) return false;
+        if (reviewFilter === "edit" && entry?.action !== "edit") return false;
+        if (reviewFilter === "delete" && entry?.action !== "delete") return false;
+      }
       return true;
     });
-  }, [baseFiltered, pool, topic]);
+  }, [baseFiltered, pool, reviewFilter, reviews, reviewsEnabled, topic]);
+
+  const reviewCounts = useMemo(() => {
+    let edit = 0;
+    let del = 0;
+    for (const entry of Object.values(reviews)) {
+      if (entry.action === "edit") edit += 1;
+      else if (entry.action === "delete") del += 1;
+    }
+    return { edit, delete: del };
+  }, [reviews]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
@@ -151,7 +218,7 @@ export function QuestionsPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [angle, language, pool, search, spicyFilter, topic]);
+  }, [angle, language, pool, reviewFilter, search, spicyFilter, topic]);
 
   const handleTopicSelect = (nextTopic: "all" | QuestionTopicId) => {
     setTopic(nextTopic);
@@ -417,6 +484,18 @@ export function QuestionsPage() {
             <option value="friendly">{t.questions.friendlyOnly}</option>
             <option value="spicy">{t.questions.spicyOnly}</option>
           </select>
+          {reviewsEnabled && (
+            <select
+              aria-label="Review filter"
+              value={reviewFilter}
+              onChange={(e) => setReviewFilter(e.target.value as "all" | "marked" | "edit" | "delete")}
+            >
+              <option value="all">Review: All ({reviewCounts.edit} edit, {reviewCounts.delete} del)</option>
+              <option value="marked">Marked ({reviewCounts.edit + reviewCounts.delete})</option>
+              <option value="edit">Edit / Rephrase ({reviewCounts.edit})</option>
+              <option value="delete">Delete ({reviewCounts.delete})</option>
+            </select>
+          )}
         </div>
       </section>
 
@@ -432,8 +511,13 @@ export function QuestionsPage() {
           <ul className="questions-list">
             {pagedQuestions.map((q) => {
               const qTopic = POOL_TO_TOPIC[q.pool];
+              const review = reviews[q.id];
+              const draftNote = draftNotes[q.id] ?? review?.note ?? "";
               return (
-                <li key={q.id} className="question-tracker-item">
+                <li
+                  key={q.id}
+                  className={`question-tracker-item${review ? ` is-review-${review.action}` : ""}`}
+                >
                   <div className="question-tracker-body">
                     <strong>{q.text}</strong>
                     <div className="muted small-copy">{q.id}</div>
@@ -445,6 +529,44 @@ export function QuestionsPage() {
                     <span className="question-tracker-pill">{q.angle}</span>
                     {q.spicy && <span className="question-tracker-pill is-spicy">18+</span>}
                   </div>
+                  {reviewsEnabled && (
+                    <div className="question-review-box">
+                      <div className="question-review-actions">
+                        <button
+                          type="button"
+                          className={`question-review-btn${review?.action === "edit" ? " is-edit-active" : ""}`}
+                          onClick={() => void saveReview(q, review?.action === "edit" ? "clear" : "edit", draftNote)}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          className={`question-review-btn${review?.action === "delete" ? " is-delete-active" : ""}`}
+                          onClick={() => void saveReview(q, review?.action === "delete" ? "clear" : "delete", draftNote)}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                      <input
+                        type="text"
+                        className="question-review-note"
+                        placeholder="Why / how to rephrase..."
+                        value={draftNote}
+                        onChange={(e) => setDraftNotes((prev) => ({ ...prev, [q.id]: e.target.value }))}
+                        onBlur={() => {
+                          if (review && draftNote.trim() !== review.note) {
+                            void saveReview(q, review.action, draftNote);
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            void saveReview(q, review?.action ?? "edit", draftNote);
+                          }
+                        }}
+                      />
+                    </div>
+                  )}
                 </li>
               );
             })}

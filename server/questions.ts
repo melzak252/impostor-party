@@ -16,7 +16,78 @@ interface QuestionPoolItem {
   pool: string;
   spicy?: boolean;
   angle?: "pos" | "neg" | "weird";
+  shape?: string;
+  conflictGroup?: string;
+  noWildcard?: boolean;
   text: string;
+}
+
+const SHAPE_COMPATIBILITY: Readonly<Record<string, readonly string[]>> = {
+  scale_1_10: ["scale_1_10"],
+  count_0_10: ["count_0_10"],
+  count_tiny: ["count_tiny"],
+  count_small: ["count_small"],
+  count_medium: ["count_medium"],
+  days_short: ["days_short"],
+  hours_short: ["hours_short"],
+  minutes: ["minutes"],
+  minutes_long: ["minutes_long"],
+  count_large: ["count_large"],
+  fixed_fact: ["fixed_fact"],
+  weapon_useful: ["weapon_useful"],
+  weapon_joke: ["weapon_joke"],
+  gift: ["gift", "household", "buy"],
+  buy: ["buy", "gift", "household"],
+  carry: ["carry"],
+  household: ["household", "gift", "buy"],
+  weird_object: ["weird_object"],
+  toy: ["toy"],
+  hotel_item: ["hotel_item"],
+  kitchen_gadget: ["kitchen_gadget"],
+  trait_habit: ["trait_habit"],
+  excuse_lie: ["excuse_lie"],
+  kink_turnon: ["kink_turnon"],
+  drunk_stunt: ["drunk_stunt"],
+  text_fail: ["text_fail"],
+  pickup_line: ["pickup_line"],
+  dating_flag: ["dating_flag"],
+  sex_position: ["sex_position"],
+  cm_small: ["cm_small"],
+  height_cm: ["height_cm"],
+  weight_kg: ["weight_kg"],
+  age_young: ["age_young"],
+  actor: ["actor"],
+  movie_title: ["movie_title"],
+  celebrity_person: ["celebrity_person"],
+  friend_person: ["friend_person"],
+  general_person: ["general_person"],
+  relationship_role: ["relationship_role"],
+  meal_food: ["meal_food", "general_food"],
+  snack_drink: ["snack_drink", "general_food"],
+  general_food: ["general_food", "meal_food", "snack_drink"],
+  smelly_food: ["smelly_food"],
+  food_prop: ["food_prop"],
+  food_combo: ["food_combo"],
+  normal_place: ["normal_place"],
+  obscure_name_place: ["obscure_name_place"],
+  normal_job: ["normal_job"],
+  bizarre_job: ["bizarre_job"],
+  spicy_job: ["spicy_job"],
+  utility_app: ["utility_app", "general_app"],
+  social_app: ["social_app", "general_app"],
+  general_app: ["general_app", "utility_app", "social_app"],
+  companion_animal: ["companion_animal", "general_animal"],
+  wild_animal: ["wild_animal", "general_animal"],
+  pest_animal: ["pest_animal"],
+  general_animal: ["general_animal", "companion_animal", "wild_animal"],
+};
+
+function areShapesCompatible(a?: string, b?: string): boolean {
+  if (!a || !b) return true;
+  if (a === b) return true;
+  return Boolean(
+    SHAPE_COMPATIBILITY[a]?.includes(b) || SHAPE_COMPATIBILITY[b]?.includes(a),
+  );
 }
 
 export const BUILTIN_QUESTION_PAIRS: readonly QuestionPair[] = [
@@ -47,6 +118,7 @@ export const BUILTIN_QUESTION_PAIRS: readonly QuestionPair[] = [
 ];
 
 const WEAK_BUILTIN_IDS = new Set([
+  "builtin-04",
   "builtin-07",
   "builtin-10",
   "builtin-14",
@@ -82,12 +154,18 @@ const WILDCARD_IMPOSTOR_PROMPTS: Readonly<Record<string, string>> = {
   spicy_confessions: "Make up a random chaotic 1-line confession.",
 };
 
+const PAIRING_POOL_ALIAS: Readonly<Record<string, string>> = {
+  spicy_numbers: "numbers_small",
+  spicy_person: "table_players",
+};
+
 function buildMixedPoolPairs(items: readonly QuestionPoolItem[]): QuestionPair[] {
   const byPool = new Map<string, QuestionPoolItem[]>();
   for (const item of items) {
-    const list = byPool.get(item.pool) ?? [];
+    const groupPool = PAIRING_POOL_ALIAS[item.pool] ?? item.pool;
+    const list = byPool.get(groupPool) ?? [];
     list.push(item);
-    byPool.set(item.pool, list);
+    byPool.set(groupPool, list);
   }
   const pairs: QuestionPair[] = [];
   for (const [pool, group] of byPool) {
@@ -97,6 +175,8 @@ function buildMixedPoolPairs(items: readonly QuestionPoolItem[]): QuestionPair[]
         if (i === j) continue;
         const impostor = group[j]!;
         if (normal.angle && impostor.angle && normal.angle === impostor.angle) continue;
+        if (normal.conflictGroup && impostor.conflictGroup && normal.conflictGroup === impostor.conflictGroup) continue;
+        if (!areShapesCompatible(normal.shape, impostor.shape)) continue;
         if (normal.text.trim().toLowerCase() === impostor.text.trim().toLowerCase()) continue;
         pairs.push({
           id: `mix:${pool}:${normal.id}:${impostor.id}`,
@@ -105,7 +185,7 @@ function buildMixedPoolPairs(items: readonly QuestionPoolItem[]): QuestionPair[]
         });
       }
       const wildcard = WILDCARD_IMPOSTOR_PROMPTS[pool];
-      if (wildcard) {
+      if (wildcard && !normal.noWildcard) {
         pairs.push({
           id: `wild:${pool}:${normal.id}`,
           normalQuestion: normal.text,
