@@ -23,7 +23,6 @@ type PartySettingsWithLanguage = PartySettings & {
 const TOPIC_IDS: ReadonlyArray<QuestionTopicId> = [
   "animals",
   "movies_tv",
-  "actors",
   "games",
   "music",
   "friends",
@@ -500,6 +499,14 @@ function SettingsPanel({
                 <h2>{t.lobby.topicsLabel} <span className="count-badge">{activeTopics.length}/{TOPIC_IDS.length}</span></h2>
               </div>
               <div className="button-row">
+                <Link
+                  to="/questions"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="quiet-button link-button"
+                >
+                  {t.home.questionsButton}
+                </Link>
                 {isHost && activeTopics.length < TOPIC_IDS.length && (
                   <button
                     type="button"
@@ -529,7 +536,7 @@ function SettingsPanel({
                     onClick={() => toggleTopic(topicId)}
                   >
                     <span className="topic-box-name">{t.lobby.topics[topicId]}</span>
-                    <span className="topic-box-state">{isActive ? "✓" : "—"}</span>
+                    <span className="topic-box-state">{isActive ? "✓" : "-"}</span>
                   </button>
                 ) : (
                   <div
@@ -537,7 +544,7 @@ function SettingsPanel({
                     className={`topic-box is-readonly${isActive ? " is-active" : ""}`}
                   >
                     <span className="topic-box-name">{t.lobby.topics[topicId]}</span>
-                    <span className="topic-box-state">{isActive ? "✓" : "—"}</span>
+                    <span className="topic-box-state">{isActive ? "✓" : "-"}</span>
                   </div>
                 );
               })}

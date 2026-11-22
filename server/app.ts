@@ -1,14 +1,21 @@
 import index from "../client/index.html";
-import { randomInt as cryptoRandomInt } from "node:crypto";
+import { createHash, randomInt as cryptoRandomInt, randomUUID, timingSafeEqual } from "node:crypto";
 import { mkdir, access } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import { z } from "zod";
-import { ActionRequestSchema, APP_VERSION, GameLanguageSchema } from "../shared/protocol";
+import {
+  ActionRequestSchema,
+  APP_VERSION,
+  CreateSuggestionBodySchema,
+  GameLanguageSchema,
+  SuggestionStatusSchema,
+  UpdateSuggestionStatusSchema,
+} from "../shared/protocol";
 import { PartyError, PartyService, hashSessionToken } from "./party";
 import type { PartySocketIdentity } from "./party";
 import { PartyStore } from "./store";
 import { advanceGameDeadline, applyGameAction } from "./game";
-import { getQuestionCatalog } from "./questions";
+import { getQuestionCatalog, setApprovedSuggestions } from "./questions";
 import { translateText } from "./translate";
 
 const MAX_REQUEST_BYTES = 16 * 1024;
@@ -30,6 +37,7 @@ export interface AppOptions {
   dbPath: string;
   appOrigin?: string;
   allowSameHostOrigin?: boolean;
+  adminToken?: string;
   now?: () => number;
   randomInt?: (maxExclusive: number) => number;
 }
@@ -87,6 +95,23 @@ function validationError(): PartyError {
 
 function rateLimitError(): PartyError {
   return new PartyError("RATE_LIMITED", 429, "Too many requests. Try again shortly.");
+}
+
+function sha256Bytes(value: string): Buffer {
+  return createHash("sha256").update(value, "utf8").digest();
+}
+
+function requireAdminAuth(request: Request, adminToken: string | undefined): void {
+  if (!adminToken) {
+    throw new PartyError("FORBIDDEN", 403, "Admin moderation is not configured.");
+  }
+  const authHeader = request.headers.get("authorization");
+  const bearer = authHeader?.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
+  const headerToken = request.headers.get("x-admin-token")?.trim() ?? "";
+  const candidate = bearer || headerToken;
+  if (!candidate || !timingSafeEqual(sha256Bytes(candidate), sha256Bytes(adminToken))) {
+    throw new PartyError("UNAUTHORIZED", 401, "Invalid or missing admin token.");
+  }
 }
 
 async function readJsonBody(request: Request): Promise<unknown> {
@@ -220,6 +245,9 @@ export async function createApp(options: AppOptions): Promise<{ url: string; clo
   }
   parties.setGameActionHandler(applyGameAction);
   parties.setDeadlineHandler(advanceGameDeadline);
+  setApprovedSuggestions(store.listSuggestions("approved"));
+  const adminToken = options.adminToken?.trim() || undefined;
+  const now = options.now ?? Date.now;
   const rateLimiter = new RequestRateLimiter();
   let stopping = false;
   let appOrigin = options.appOrigin ? new URL(options.appOrigin).origin : undefined;
@@ -273,6 +301,68 @@ export async function createApp(options: AppOptions): Promise<{ url: string; clo
 
           if (path === "/api/questions" && request.method === "GET") {
             return apiResponse(getQuestionCatalog());
+          }
+
+          if (path === "/api/suggestions" && request.method === "POST") {
+            if (!appOrigin && !allowSameHostOrigin) throw new PartyError("FORBIDDEN", 403, "The application origin is not configured.");
+            requireOrigin(request, appOrigin, allowSameHostOrigin);
+            const address = server.requestIP(request)?.address ?? "unknown";
+            const token = sessionTokenFromCookie(request);
+            const sessionHash = token ? hashSessionToken(token) : null;
+            const rateKey = `${address}:${sessionHash ?? "anon"}`;
+            if (!rateLimiter.consume("suggestion", rateKey, 5, 60 * 60 * 1000, now())) {
+              throw rateLimitError();
+            }
+            const body = parseBody(CreateSuggestionBodySchema, await readJsonBody(request));
+            if (body.honeypot && body.honeypot.trim().length > 0) {
+              return apiResponse({ ok: true, id: "accepted" }, 201);
+            }
+            const text = body.text.trim().replace(/\s+/g, " ");
+            const textLength = Array.from(text).length;
+            if (textLength < 8 || textLength > 140) {
+              throw new PartyError("VALIDATION_ERROR", 400, "Question must be between 8 and 140 characters.");
+            }
+            if (/https?:\/\/|www\./i.test(text)) {
+              throw new PartyError("VALIDATION_ERROR", 400, "Links are not allowed in question suggestions.");
+            }
+            if (store.countPendingSuggestions() >= 500) {
+              throw new PartyError("RATE_LIMITED", 429, "Suggestion queue is full. Try again later.");
+            }
+            const lower = text.toLowerCase();
+            const existingBuiltin = getQuestionCatalog().questions.some((q) => q.text.trim().toLowerCase() === lower);
+            if (existingBuiltin || store.hasDuplicateSuggestion(text)) {
+              throw new PartyError("DUPLICATE_SUGGESTION", 409, "A matching question already exists or is pending review.");
+            }
+            const created = store.createSuggestion({
+              id: randomUUID(),
+              topic: body.topic,
+              language: body.language,
+              spicy: body.spicy,
+              text,
+              status: "pending",
+              sessionHash,
+              createdAt: now(),
+              reviewedAt: null,
+            });
+            return apiResponse({ ok: true, id: created.id }, 201);
+          }
+
+          if (path === "/api/admin/suggestions" && request.method === "GET") {
+            requireAdminAuth(request, adminToken);
+            const rawStatus = url.searchParams.get("status");
+            const status = rawStatus ? parseBody(SuggestionStatusSchema, rawStatus) : undefined;
+            return apiResponse({ suggestions: store.listSuggestions(status) });
+          }
+
+          const adminSuggestionMatch = /^\/api\/admin\/suggestions\/([0-9a-f-]{36})$/i.exec(path);
+          if (adminSuggestionMatch && request.method === "PATCH") {
+            requireAdminAuth(request, adminToken);
+            if (request.headers.get("origin")) requireOrigin(request, appOrigin, allowSameHostOrigin);
+            const body = parseBody(UpdateSuggestionStatusSchema, await readJsonBody(request));
+            const updated = store.updateSuggestionStatus(adminSuggestionMatch[1]!, body.status, now());
+            if (!updated) throw new PartyError("NOT_FOUND", 404, "Suggestion not found.");
+            setApprovedSuggestions(store.listSuggestions("approved"));
+            return apiResponse({ ok: true, id: adminSuggestionMatch[1]!, status: body.status });
           }
 
           if (path === "/api/tts" && request.method === "GET") {

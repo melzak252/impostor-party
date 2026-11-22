@@ -259,4 +259,11 @@ export const PL_PARTY_TRANSLATIONS: Readonly<Record<string, string>> = {
   "Small romantic gesture that folds you every time?": "Mały romantyczny gest, przy którym za każdym razem miękniesz?",
   "Most unhinged thing in your Notes app you'd hide from a date?": "Najbardziej odklejona rzecz w twoich Notatkach, którą ukryłbyś(-abyś) przed randką?",
   "Ultimate date idea when you want real chemistry?": "Idealny pomysł na randkę, kiedy chcesz poczuć prawdziwą chemię?",
+  "Who is probably a villain in real life?": "Kto w prawdziwym życiu jest pewnie czarnym charakterem?",
+  "Who has the most iconic voice?": "Kto ma najbardziej kultowy głos?",
+  "Who do you want narrating your life?": "Kto powinien być narratorem Twojego życia?",
+  "Who do you want defending you in court?": "Kogo chciałbyś mieć jako obrońcę w sądzie?",
+  "Worst person to have as a roommate?": "Najgorsza osoba na współlokatora?",
+  "Who would you want as a neighbor?": "Kogo chciałbyś mieć za sąsiada?",
+  "Who would be the coolest high school teacher?": "Kto byłby najfajniejszym nauczycielem w liceum?",
 };

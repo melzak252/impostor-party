@@ -1,4 +1,11 @@
-import { APP_VERSION, QUESTION_TOPIC_LIST, type GameLanguage, type QuestionPair, type QuestionTopicId } from "../shared/protocol";
+import {
+  APP_VERSION,
+  QUESTION_TOPIC_LIST,
+  type GameLanguage,
+  type QuestionPair,
+  type QuestionSuggestion,
+  type QuestionTopicId,
+} from "../shared/protocol";
 import { POP_QUESTION_ITEMS } from "./questionsPop";
 import { PARTY_QUESTION_ITEMS } from "./questionsParty";
 import { TOPIC_QUESTION_ITEMS } from "./questionTopics";
@@ -54,7 +61,6 @@ const GOOD_BUILTIN_PAIRS: readonly QuestionPair[] = BUILTIN_QUESTION_PAIRS.filte
 
 const WILDCARD_IMPOSTOR_PROMPTS: Readonly<Record<string, string>> = {
   animals: "Pick a random animal off the top of your head.",
-  actors: "Name a random actor or actress right now.",
   movies: "Name any random movie title.",
   tv_series: "Name any random TV series.",
   games: "Name any random video game.",
@@ -130,11 +136,46 @@ const SPICY_BUILTIN_CATALOGUE: readonly QuestionPair[] = [
   ...ALL_MIXED_PAIRS,
 ];
 
+let approvedSuggestions: readonly QuestionSuggestion[] = [];
+
+const TOPIC_DEFAULT_POOL: Readonly<Record<QuestionTopicId, string>> = {
+  animals: "animals",
+  movies_tv: "movies",
+  games: "games",
+  music: "songs",
+  friends: "island_person",
+  superpowers: "superpowers",
+  food_places: "foods",
+  everyday: "things_objects",
+  pop_life: "characters",
+};
+
+export function setApprovedSuggestions(suggestions: readonly QuestionSuggestion[]): void {
+  approvedSuggestions = [...suggestions];
+}
+
+function getApprovedSuggestionPairs(
+  spicyMode: boolean,
+  language: GameLanguage,
+): QuestionPair[] {
+  return approvedSuggestions
+    .filter((item) => item.language === language && (!item.spicy || spicyMode))
+    .map((item) => {
+      const pool = TOPIC_DEFAULT_POOL[item.topic];
+      const wildcard = WILDCARD_IMPOSTOR_PROMPTS[pool] ?? "Make up a fitting answer.";
+      return {
+        id: `sug:${pool}:${item.id}`,
+        normalQuestion: item.text,
+        impostorQuestion: wildcard,
+      };
+    });
+}
+
 function isPairInAllowedPools(pairId: string, allowedPools: ReadonlySet<string>): boolean {
   if (pairId.startsWith("builtin-")) return allowedPools.has("classic");
   const parts = pairId.split(":");
   const prefix = parts[0];
-  if (prefix === "mix" || prefix === "wild" || prefix === "loc" || prefix === "locwild") {
+  if (prefix === "mix" || prefix === "wild" || prefix === "loc" || prefix === "locwild" || prefix === "sug") {
     return parts[1] ? allowedPools.has(parts[1]) : false;
   }
   if (prefix === "native") {
@@ -150,7 +191,9 @@ export function getBuiltinQuestionPairs(
 ): readonly QuestionPair[] {
   const base = spicyMode ? SPICY_BUILTIN_CATALOGUE : FRIENDLY_BUILTIN_CATALOGUE;
   const localized = language === "en" ? [] : getLocalizedPairs(language, spicyMode);
-  const all = localized.length > 0 ? [...localized, ...base] : base;
+  const community = getApprovedSuggestionPairs(spicyMode, language);
+  const combinedBase = localized.length > 0 ? [...localized, ...base] : base;
+  const all = community.length > 0 ? [...combinedBase, ...community] : combinedBase;
   if (!enabledTopics || enabledTopics.length === 0) return all;
 
   const topicSet = new Set(enabledTopics);
@@ -184,7 +227,15 @@ export function getQuestionCatalog() {
     spicy: Boolean(item.spicy),
     text: item.text,
   }));
-  const questions = [...englishPoolQuestions, ...localizedQuestions, ...classicQuestions];
+  const communityQuestions = approvedSuggestions.map((item) => ({
+    id: `sug-${item.id}`,
+    pool: TOPIC_DEFAULT_POOL[item.topic],
+    language: item.language,
+    angle: "community",
+    spicy: item.spicy,
+    text: item.text,
+  }));
+  const questions = [...communityQuestions, ...englishPoolQuestions, ...localizedQuestions, ...classicQuestions];
   return {
     version: APP_VERSION,
     totalQuestions: questions.length,

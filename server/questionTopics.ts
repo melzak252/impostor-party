@@ -87,6 +87,10 @@ const TABLE_PLAYER_TOPICS: readonly TopicEntry[] = [
   { id: "best-liar", angle: "neg", phrase: "is dangerously good at lying with a straight face" },
   { id: "most-gullible", angle: "neg", phrase: "believes every fake TikTok fact they see" },
   { id: "worst-advice", angle: "neg", phrase: "gives the absolute worst life advice" },
+  { id: "lawyer", angle: "pos", phrase: "would you want defending you in court" },
+  { id: "worst-roommate", angle: "neg", phrase: "would be the worst roommate" },
+  { id: "best-neighbor", angle: "pos", phrase: "would be the best neighbor" },
+  { id: "cool-teacher", angle: "weird", phrase: "would be the coolest high school teacher" },
 
   // Spicy 18+ ("spicy: true")
   { id: "flirt", angle: "pos", spicy: true, phrase: "is the smoothest flirt" },
@@ -250,10 +254,7 @@ const CHARACTER_TOPICS: readonly TopicEntry[] = [
   { id: "cooking", angle: "weird", phrase: "would burn water trying to cook" },
   { id: "grocery", angle: "weird", phrase: "would cause total chaos in a grocery store" },
   { id: "karaoke", angle: "weird", phrase: "would steal the mic at karaoke and refuse to leave" },
-  { id: "dmv", angle: "weird", phrase: "would lose their mind waiting in line at the DMV" },
   { id: "podcast", angle: "weird", phrase: "should definitely not be allowed to start a podcast" },
-  { id: "escape-room", angle: "weird", phrase: "would accidentally break everything in an escape room" },
-  { id: "pet-sitter", angle: "weird", phrase: "would you never trust to pet-sit your goldfish" },
   { id: "crush", angle: "pos", spicy: true, phrase: "was your biggest fictional crush growing up" },
   { id: "red-flag", angle: "neg", spicy: true, phrase: "is the biggest fictional red flag you'd still date" },
 ];
@@ -282,10 +283,7 @@ const APP_TOPICS: readonly TopicEntry[] = [
   { id: "grandma", angle: "weird", phrase: "would be funniest to explain to your grandparents" },
   { id: "nostalgia", angle: "weird", phrase: "do you miss most from the early internet era" },
   { id: "museum", angle: "weird", phrase: "belongs in a digital history museum" },
-  { id: "president", angle: "weird", phrase: "would cause chaos if it ran the government" },
   { id: "bored", angle: "weird", phrase: "do you open purely out of muscle memory when bored" },
-  { id: "alien-report", angle: "weird", phrase: "would confuse aliens most about human civilization" },
-  { id: "no-wifi", angle: "weird", phrase: "would you miss the weirdest amount if Wi-Fi vanished for a month" },
   { id: "dating", angle: "neg", spicy: true, phrase: "is the worst place to meet a romantic partner" },
   { id: "stalk", angle: "weird", spicy: true, phrase: "is best for shameless late-night stalking" },
 ];
@@ -315,9 +313,6 @@ const JOB_TOPICS: readonly TopicEntry[] = [
   { id: "lottery", angle: "weird", phrase: "would you do just for fun after winning the lottery" },
   { id: "tv-show", angle: "weird", phrase: "deserves its own wildly dramatic reality TV show" },
   { id: "uniform", angle: "weird", phrase: "has the best or funniest uniform" },
-  { id: "party-story", angle: "weird", phrase: "gives you the best stories to tell at dinner parties" },
-  { id: "medieval", angle: "weird", phrase: "would you have ended up doing in medieval times" },
-  { id: "animal", angle: "weird", phrase: "would a golden retriever be surprisingly good at" },
   { id: "date-redflag", angle: "neg", spicy: true, phrase: "is an instant red flag on a dating profile" },
   { id: "spicy-rich", angle: "weird", spicy: true, phrase: "would you do if you needed $10,000 by Friday" },
 ];

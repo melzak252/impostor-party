@@ -1,6 +1,12 @@
 import { Database } from "bun:sqlite";
 import { z } from "zod";
-import { QuestionTopicIdSchema } from "../shared/protocol";
+import {
+  QuestionTopicIdSchema,
+  type GameLanguage,
+  type QuestionSuggestion,
+  type QuestionTopicId,
+  type SuggestionStatus,
+} from "../shared/protocol";
 import type { PartyState } from "./model";
 
 const ColorIdSchema = z.enum(["coral", "amber", "mint", "cyan", "blue", "violet"]);
@@ -95,6 +101,17 @@ export class PartyStore {
       this.db.exec(`CREATE TABLE IF NOT EXISTS sessions(token_hash TEXT PRIMARY KEY, expires_at INTEGER NOT NULL);
         CREATE TABLE IF NOT EXISTS parties(id TEXT PRIMARY KEY, code TEXT UNIQUE NOT NULL, state_json TEXT NOT NULL, updated_at INTEGER NOT NULL);
         CREATE TABLE IF NOT EXISTS memberships(session_hash TEXT PRIMARY KEY REFERENCES sessions(token_hash), party_id TEXT NOT NULL REFERENCES parties(id) ON DELETE CASCADE, player_id TEXT NOT NULL, UNIQUE(party_id, player_id));
+        CREATE TABLE IF NOT EXISTS question_suggestions(
+          id TEXT PRIMARY KEY,
+          topic TEXT NOT NULL,
+          language TEXT NOT NULL,
+          spicy INTEGER NOT NULL,
+          text TEXT NOT NULL,
+          status TEXT NOT NULL,
+          session_hash TEXT,
+          created_at INTEGER NOT NULL,
+          reviewed_at INTEGER
+        );
         PRAGMA user_version = 1;`);
     } catch (error) {
       this.db.close();
@@ -150,6 +167,72 @@ export class PartyStore {
   listParties(): PartyState[] {
     const rows = this.db.query("SELECT state_json FROM parties").all() as Array<{ state_json: string }>;
     return rows.map(row => { try { return PartyDocumentSchema.parse(JSON.parse(row.state_json)) as PartyState; } catch (error) { throw new Error(`Corrupt stored party: ${error instanceof Error ? error.message : String(error)}`); } });
+  }
+  createSuggestion(suggestion: QuestionSuggestion & { sessionHash: string | null }): QuestionSuggestion {
+    this.db.query(
+      "INSERT INTO question_suggestions(id,topic,language,spicy,text,status,session_hash,created_at,reviewed_at) VALUES(?,?,?,?,?,?,?,?,?)",
+    ).run(
+      suggestion.id,
+      suggestion.topic,
+      suggestion.language,
+      suggestion.spicy ? 1 : 0,
+      suggestion.text,
+      suggestion.status,
+      suggestion.sessionHash,
+      suggestion.createdAt,
+      suggestion.reviewedAt,
+    );
+    return {
+      id: suggestion.id,
+      topic: suggestion.topic,
+      language: suggestion.language,
+      spicy: suggestion.spicy,
+      text: suggestion.text,
+      status: suggestion.status,
+      createdAt: suggestion.createdAt,
+      reviewedAt: suggestion.reviewedAt,
+    };
+  }
+  hasDuplicateSuggestion(text: string): boolean {
+    const row = this.db.query(
+      "SELECT 1 FROM question_suggestions WHERE lower(text) = lower(?) AND status IN ('pending', 'approved') LIMIT 1",
+    ).get(text);
+    return Boolean(row);
+  }
+  countPendingSuggestions(): number {
+    const row = this.db.query("SELECT COUNT(*) AS count FROM question_suggestions WHERE status = 'pending'").get() as { count: number } | null;
+    return Number(row?.count ?? 0);
+  }
+  listSuggestions(status?: SuggestionStatus): QuestionSuggestion[] {
+    const sql = status
+      ? "SELECT id, topic, language, spicy, text, status, created_at, reviewed_at FROM question_suggestions WHERE status = ? ORDER BY created_at DESC"
+      : "SELECT id, topic, language, spicy, text, status, created_at, reviewed_at FROM question_suggestions ORDER BY created_at DESC";
+    const rows = (status ? this.db.query(sql).all(status) : this.db.query(sql).all()) as Array<{
+      id: string;
+      topic: string;
+      language: string;
+      spicy: number;
+      text: string;
+      status: string;
+      created_at: number;
+      reviewed_at: number | null;
+    }>;
+    return rows.map((row) => ({
+      id: row.id,
+      topic: row.topic as QuestionTopicId,
+      language: row.language as GameLanguage,
+      spicy: Boolean(row.spicy),
+      text: row.text,
+      status: row.status as SuggestionStatus,
+      createdAt: row.created_at,
+      reviewedAt: row.reviewed_at,
+    }));
+  }
+  updateSuggestionStatus(id: string, status: "approved" | "rejected", reviewedAt: number): boolean {
+    const result = this.db.query(
+      "UPDATE question_suggestions SET status = ?, reviewed_at = ? WHERE id = ?",
+    ).run(status, reviewedAt, id);
+    return result.changes > 0;
   }
   close(): void { this.db.close(); }
 }

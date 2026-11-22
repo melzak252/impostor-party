@@ -318,4 +318,8 @@ export const PL_TOPICS_TRANSLATIONS: Readonly<Record<string, string>> = {
   "How many times do you unlock your phone in a day?": "Ile razy dziennie odblokowujesz telefon?",
   "How many passwords can you remember without checking?": "Ile haseł pamiętasz z głowy bez sprawdzania?",
   "How many phone numbers do you know by heart?": "Ile numerów telefonu znasz na pamięć?",
+  "Who at this table would you want defending you in court?": "Kogo z tego stołu chciałbyś jako swojego obrońcę w sądzie?",
+  "Who at this table would be the worst roommate?": "Kto z tego stołu byłby najgorszym współlokatorem?",
+  "Who at this table would be the best neighbor?": "Kto z tego stołu byłby najlepszym sąsiadem?",
+  "Who at this table would be the coolest high school teacher?": "Kto z tego stołu byłby najfajniejszym nauczycielem w liceum?",
 };

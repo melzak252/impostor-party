@@ -149,12 +149,6 @@ export const PARTY_QUESTION_ITEMS: readonly QuestionPoolItem[] = [
     text: "Superpower that causes the most accidental property damage?",
   },
   {
-    id: "party-super-24",
-    pool: "superpowers",
-    angle: "weird",
-    text: "Superpower that would baffle doctors at a checkup?",
-  },
-  {
     id: "party-super-25",
     pool: "superpowers",
     angle: "neg",
@@ -338,6 +332,48 @@ export const PARTY_QUESTION_ITEMS: readonly QuestionPoolItem[] = [
     angle: "weird",
     text: "Who's most likely to go viral by pure accident?",
   },
+  {
+    id: "party-person-28",
+    pool: "island_person",
+    angle: "neg",
+    text: "Who is probably a villain in real life?",
+  },
+  {
+    id: "party-person-29",
+    pool: "island_person",
+    angle: "pos",
+    text: "Who has the most iconic voice?",
+  },
+  {
+    id: "party-person-30",
+    pool: "island_person",
+    angle: "weird",
+    text: "Who do you want narrating your life?",
+  },
+  {
+    id: "party-person-31",
+    pool: "island_person",
+    angle: "weird",
+    text: "Who do you want defending you in court?",
+  },
+  {
+    id: "party-person-32",
+    pool: "island_person",
+    angle: "neg",
+    text: "Worst person to have as a roommate?",
+  },
+  {
+    id: "party-person-33",
+    pool: "island_person",
+    angle: "pos",
+    text: "Who would you want as a neighbor?",
+  },
+  {
+    id: "party-person-34",
+    pool: "island_person",
+    angle: "weird",
+    text: "Who would be the coolest high school teacher?",
+  },
 
   // =========================================================================
   // things_objects (28) - expects an everyday object or thing
@@ -359,12 +395,6 @@ export const PARTY_QUESTION_ITEMS: readonly QuestionPoolItem[] = [
     pool: "things_objects",
     angle: "neg",
     text: "Thing in your kitchen that's way too old?",
-  },
-  {
-    id: "party-thing-04",
-    pool: "things_objects",
-    angle: "weird",
-    text: "Everyday object that would break a medieval peasant's brain?",
   },
   {
     id: "party-thing-05",

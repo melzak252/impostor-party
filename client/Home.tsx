@@ -32,8 +32,11 @@ function Header() {
         <span className="brand-mark" aria-hidden="true" />
         <span>{t.common.brand}</span>
       </Link>
-      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap", justifyContent: "flex-end" }}>
         <span className="eyebrow">{t.home.eyebrow}</span>
+        <Link to="/questions" className="secondary link-button header-questions-btn">
+          {t.home.questionsButton}
+        </Link>
         <select
           aria-label="Language"
           value={lang}
@@ -399,7 +402,7 @@ export function Home() {
       <footer className="page-footer">
         <span>{t.home.footerLeft}</span>
         <span>
-          <Link to="/questions">Questions</Link> · {t.home.footerRight}
+          <Link to="/questions">{t.home.questionsButton}</Link> · {t.home.footerRight}
         </span>
       </footer>
     </main>

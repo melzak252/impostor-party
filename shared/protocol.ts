@@ -9,7 +9,6 @@ export type GameLanguage = z.infer<typeof GameLanguageSchema>;
 export const QuestionTopicIdSchema = z.enum([
   "animals",
   "movies_tv",
-  "actors",
   "games",
   "music",
   "friends",
@@ -22,7 +21,6 @@ export type QuestionTopicId = z.infer<typeof QuestionTopicIdSchema>;
 export const QUESTION_TOPIC_LIST: ReadonlyArray<{ id: QuestionTopicId; pools: readonly string[] }> = [
   { id: "animals", pools: ["animals"] },
   { id: "movies_tv", pools: ["movies", "tv_series"] },
-  { id: "actors", pools: ["actors"] },
   { id: "games", pools: ["games"] },
   { id: "music", pools: ["songs", "music_artists"] },
   {
@@ -99,3 +97,31 @@ export interface PartySnapshot {
   customQuestions?: QuestionPair[];
 }
 export const ActionRequestBodySchema = ActionRequestSchema;
+
+export const SuggestionStatusSchema = z.enum(["pending", "approved", "rejected"]);
+export type SuggestionStatus = z.infer<typeof SuggestionStatusSchema>;
+
+export const CreateSuggestionBodySchema = z.object({
+  topic: QuestionTopicIdSchema,
+  language: GameLanguageSchema,
+  spicy: z.boolean(),
+  text: z.string(),
+  honeypot: z.string().optional(),
+}).strict();
+export type CreateSuggestionBody = z.infer<typeof CreateSuggestionBodySchema>;
+
+export const UpdateSuggestionStatusSchema = z.object({
+  status: z.enum(["approved", "rejected"]),
+}).strict();
+export type UpdateSuggestionStatus = z.infer<typeof UpdateSuggestionStatusSchema>;
+
+export interface QuestionSuggestion {
+  id: string;
+  topic: QuestionTopicId;
+  language: GameLanguage;
+  spicy: boolean;
+  text: string;
+  status: SuggestionStatus;
+  createdAt: number;
+  reviewedAt: number | null;
+}
