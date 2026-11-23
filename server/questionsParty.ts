@@ -1702,5 +1702,13 @@ export const PARTY_QUESTION_ITEMS: readonly QuestionPoolItem[] = [
     "shape": "dating_flag",
     "text": "Small habit that's an instant red flag (like milk before cereal)?",
     "noWildcard": true
+  },
+  {
+    "id": "party-char-creature-smash",
+    "pool": "characters",
+    "spicy": true,
+    "angle": "weird",
+    "conflictGroup": "char_smash",
+    "text": "Which creature would you hook up with?"
   }
 ];

@@ -21,6 +21,7 @@ export function projectParty(state: PartyState, viewerId: string, connectedIds: 
       hasAnswered: Boolean(state.round && Object.hasOwn(state.round.answers, player.id)),
       isReady: Boolean(state.round?.readyPlayerIds.includes(player.id)),
       hasVoted: Boolean(state.round && Object.hasOwn(state.round.votes, player.id)),
+      score: player.score ?? 0,
     })),
     round: null,
     notice: state.notice ? { ...state.notice } : null,
@@ -33,13 +34,18 @@ export function projectParty(state: PartyState, viewerId: string, connectedIds: 
   const round = state.round;
   if (!round) return snapshot;
 
+  const totalRounds = state.settings.roundCount ?? 5;
   const roundSnapshot: RoundSnapshot = {
     id: round.id,
     number: round.number,
+    matchRound: round.matchRound ?? 1,
+    totalRounds,
+    isSpicy: Boolean(round.isSpicy),
     participants: round.participants.map((participant) => ({ ...participant })),
     privateQuestion: viewer.id === round.impostorId ? round.impostorQuestion : round.normalQuestion,
     myAnswer: Object.hasOwn(round.answers, viewer.id) ? round.answers[viewer.id]! : null,
     myVote: Object.hasOwn(round.votes, viewer.id) ? round.votes[viewer.id]! : null,
+    answerDeadlineAt: round.answerDeadlineAt ?? null,
     questionRevealAt: round.questionRevealAt,
   };
 
@@ -53,6 +59,7 @@ export function projectParty(state: PartyState, viewerId: string, connectedIds: 
     roundSnapshot.impostorQuestion = round.impostorQuestion;
     roundSnapshot.impostorId = round.impostorId;
     roundSnapshot.votes = { ...round.votes };
+    if (round.roundPoints) roundSnapshot.roundPoints = { ...round.roundPoints };
   }
 
   snapshot.round = roundSnapshot;

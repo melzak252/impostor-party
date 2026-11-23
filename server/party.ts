@@ -14,7 +14,7 @@ const SESSION_LIFETIME_MS = 30 * 24 * 60 * 60 * 1000;
 const RECONNECTION_GRACE_MS = 60 * 1000;
 const PARTY_INACTIVITY_MS = 24 * 60 * 60 * 1000;
 const REMOVED_SOCKET_CLOSE_DELAY_MS = 1_000;
-const MAX_PLAYERS = 6;
+const MAX_PLAYERS = 8;
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const ACTIVE_ROUND_PHASES = new Set<PartyState["phase"]>(["answering", "answers", "question", "voting"]);
 
@@ -264,6 +264,7 @@ export class PartyService {
             joinedAt: now,
             connected: false,
             disconnectedAt: now,
+            score: 0,
           };
           const state: PartyState = {
             id: randomUUID(),
@@ -279,11 +280,14 @@ export class PartyService {
               questionRevealMode: "ready",
               questionSource: "builtin",
               spicyMode: false,
+              answerTimeSeconds: 60,
+              roundCount: 5,
               ...(language ? { language } : {}),
             },
             players: [player],
             customQuestions: [],
             usedQuestionIds: [],
+            usedNormalQuestions: [],
             lastRoundNumber: 0,
             round: null,
             bannedSessionHashes: [],
@@ -343,6 +347,7 @@ export class PartyService {
         joinedAt: now,
         connected: false,
         disconnectedAt: now,
+        score: 0,
       };
       state.players.push(player);
       state.version += 1;
@@ -465,11 +470,16 @@ export class PartyService {
           || state.settings.questionSource !== action.settings.questionSource
           || (state.settings.spicyMode ?? false) !== (action.settings.spicyMode ?? false)
           || (state.settings.language ?? "en") !== (action.settings.language ?? "en")
+          || (state.settings.answerTimeSeconds ?? 60) !== (action.settings.answerTimeSeconds ?? 60)
+          || (state.settings.roundCount ?? 5) !== (action.settings.roundCount ?? 5)
           || topicsChanged;
         if (settingsChanged) {
           const sourceChanged = state.settings.questionSource !== action.settings.questionSource;
           state.settings = { ...action.settings };
-          if (sourceChanged || topicsChanged) state.usedQuestionIds = [];
+          if (sourceChanged || topicsChanged) {
+            state.usedQuestionIds = [];
+            state.usedNormalQuestions = [];
+          }
           state.version += 1;
           state.updatedAt = now;
           this.store.saveParty(state);

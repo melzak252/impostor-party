@@ -22,7 +22,7 @@ export interface PublicParty {
   roomName?: string;
   hostName: string;
   playerCount: number;
-  maxPlayers: 6;
+  maxPlayers: 8;
 }
 
 export class ApiError extends Error {
@@ -52,21 +52,27 @@ const PlayerSnapshotSchema = z.object({
   hasAnswered: z.boolean(),
   isReady: z.boolean(),
   hasVoted: z.boolean(),
+  score: z.number().int().nonnegative(),
 }).strict();
 const RoundParticipantSchema = z.object({ id: z.string(), name: z.string(), colorId: ColorIdSchema }).strict();
 const RoundSnapshotSchema = z.object({
   id: z.string(),
   number: z.number().int(),
+  matchRound: z.number().int(),
+  totalRounds: z.number().int(),
+  isSpicy: z.boolean(),
   participants: z.array(RoundParticipantSchema),
   privateQuestion: z.string(),
   myAnswer: z.string().nullable(),
   myVote: z.string().nullable(),
+  answerDeadlineAt: z.number().nullable(),
   questionRevealAt: z.number().nullable(),
   answers: z.record(z.string(), z.string()).optional(),
   normalQuestion: z.string().optional(),
   impostorQuestion: z.string().optional(),
   impostorId: z.string().optional(),
   votes: z.record(z.string(), z.string()).optional(),
+  roundPoints: z.record(z.string(), z.number().int().nonnegative()).optional(),
 }).strict();
 const PartySnapshotSchema = z.object({
   code: z.string(),
@@ -93,7 +99,7 @@ const PublicPartyListSchema = z.object({
     roomName: z.string().optional(),
     hostName: z.string(),
     playerCount: z.number().int().nonnegative(),
-    maxPlayers: z.literal(6),
+    maxPlayers: z.literal(8),
   }).strict()),
 }).strict();
 

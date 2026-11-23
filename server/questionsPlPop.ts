@@ -163,4 +163,5 @@ export const PL_POP_TRANSLATIONS: Readonly<Record<string, string>> = {
   "Movie you wish you could watch for the first time again?": "Film, który chciałbyś znów zobaczyć po raz pierwszy?",
   "Movie that was way better than expected?": "Film, który był o wiele lepszy, niż się spodziewałeś?",
   "Most hated fictional character?": "Najbardziej znienawidzona fikcyjna postać?",
+  "What animal are you in bed?": "Jakim zwierzęciem jesteś w łóżku?",
 };

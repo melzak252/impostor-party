@@ -353,6 +353,7 @@ export const PL_PARTY_TRANSLATIONS: Readonly<Record<string, string>> = {
   "Worst sex position?": "Najgorsza pozycja seksualna?",
   "Weirdest sex position?": "Najdziwniejsza pozycja seksualna?",
   "Small habit that's an instant red flag (like milk before cereal)?": "Mały nawyk, który jest od razu red flagiem (np. najpierw mleko, potem płatki)?",
+  "Which creature would you hook up with?": "Z jakim stworzeniem byś się przespał(-a)?",
   "From what height is a guy considered short (cm)?": "Od jakiego wzrostu facet jest niski (cm)?",
   "Minimum height to play in the NBA (cm)?": "Minimalny wzrost, żeby grać w NBA (cm)?",
   "Length of a standard pencil (cm)?": "Długość zwykłego ołówka (cm)?",

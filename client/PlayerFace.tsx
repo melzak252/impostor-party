@@ -164,6 +164,36 @@ function FaceSvg({ colorId, mood }: { colorId: ColorId; mood: PlayerFaceMood }) 
           <path d="M19 42 Q26 49 32 43 Q38 49 45 42" fill="none" stroke={INK} strokeWidth="4" strokeLinecap="round" />
         </svg>
       );
+    case "rose":
+      return (
+        <svg className="player-face-svg" viewBox="0 0 64 64" width="100%" height="100%" aria-hidden="true">
+          <ellipse cx="13" cy="36" rx="5" ry="3" fill={BLUSH} />
+          <ellipse cx="51" cy="36" rx="5" ry="3" fill={BLUSH} />
+          <g className="player-face-eyes">
+            <ellipse cx="21" cy="24" rx="7" ry="8.5" fill="#fff" stroke={INK} strokeWidth="3" />
+            <ellipse cx="43" cy="24" rx="7" ry="8.5" fill="#fff" stroke={INK} strokeWidth="3" />
+            <circle cx="22" cy="24.5" r="3.6" fill={INK} />
+            <circle cx="42" cy="24.5" r="3.6" fill={INK} />
+            <circle cx="23.5" cy="22.4" r="1.4" fill="#fff" />
+            <circle cx="43.5" cy="22.4" r="1.4" fill="#fff" />
+          </g>
+          <path d="M21 41 Q32 49 43 41" fill="none" stroke={INK} strokeWidth="4" strokeLinecap="round" />
+        </svg>
+      );
+    case "lime":
+      return (
+        <svg className="player-face-svg" viewBox="0 0 64 64" width="100%" height="100%" aria-hidden="true">
+          <path d="M14 15 Q21 11 28 16" fill="none" stroke={INK} strokeWidth="3.2" strokeLinecap="round" />
+          <path d="M36 16 Q43 11 50 15" fill="none" stroke={INK} strokeWidth="3.2" strokeLinecap="round" />
+          <g className="player-face-eyes">
+            <ellipse cx="21" cy="25" rx="7" ry="8.5" fill="#fff" stroke={INK} strokeWidth="3" />
+            <ellipse cx="43" cy="25" rx="7" ry="8.5" fill="#fff" stroke={INK} strokeWidth="3" />
+            <circle cx="23" cy="25" r="3.6" fill={INK} />
+            <circle cx="45" cy="25" r="3.6" fill={INK} />
+          </g>
+          <path d="M20 42 Q32 51 44 40" fill="none" stroke={INK} strokeWidth="4" strokeLinecap="round" />
+        </svg>
+      );
   }
 }
 

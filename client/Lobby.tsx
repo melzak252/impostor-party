@@ -187,7 +187,6 @@ function InviteLink({ code }: { code: string }) {
           />
         </label>
       )}
-      <p className="muted small-copy">{t.lobby.inviteNote}</p>
     </div>
   );
 }
@@ -215,7 +214,7 @@ function PlayerTiles({
   const t = getStrings(lang);
   const occupied = new Set(players.map((player) => player.colorId));
   const ownPlayer = players.find((player) => player.id === selfId);
-  const tiles = Array.from({ length: 6 }, (_, index) => players[index] ?? null);
+  const tiles = Array.from({ length: 8 }, (_, index) => players[index] ?? null);
 
   return (
     <div className="player-grid" aria-label={t.lobby.partySeats}>
@@ -246,7 +245,10 @@ function PlayerTiles({
               <PlayerFace size="lg" colorId={player.colorId} isHost={isPlayerHost} offline={!player.connected} mood={isSelf ? "happy" : "default"} />
               <div className="player-names">
                 <strong>{player.name}{isSelf ? t.common.youSuffix : ""}</strong>
-                {isPlayerHost && <span className="host-tag">{t.lobby.hostTag}</span>}
+                <div className="player-tag-row">
+                  {isPlayerHost && <span className="host-tag">{t.lobby.hostTag}</span>}
+                  {player.score > 0 && <span className="score-tag">{t.lobby.scoreBadge(player.score)}</span>}
+                </div>
               </div>
               <div className="player-tile-status">
                 <span className={`presence ${player.connected ? "presence-online" : "presence-offline"}`}>
@@ -316,7 +318,9 @@ function SettingsPanel({
   onChange(settings: PartySettings): void;
 }) {
   const [lang, setLang] = useLanguage();
+  const [ttsEnabled, toggleTts] = useTtsEnabled();
   const [topicsOpen, setTopicsOpen] = useState(false);
+  const [settingsView, setSettingsView] = useState<"general" | "advanced">("general");
   const [draftTopics, setDraftTopics] = useState<QuestionTopicId[] | null>(null);
   const t = getStrings(lang);
   const currentGameLanguage = (settings as PartySettingsWithLanguage).language ?? "en";
@@ -356,131 +360,241 @@ function SettingsPanel({
 
   return (
     <section className="card settings-card">
-      <div className="section-heading">
+      <div className="section-heading settings-card-heading">
         <div>
           <p className="eyebrow">{t.lobby.houseRules}</p>
           <h2>{t.lobby.settings}</h2>
         </div>
-        {!isHost && <span className="sticker-badge sticker-badge--cyan">{t.lobby.hostOnly}</span>}
-      </div>
-      <div className="settings-grid">
-        <div className="setting-row">
-          <div>
-            <strong>{t.lobby.visibility}</strong>
-            <span className="setting-description">
-              {settings.visibility === "private"
-                ? t.lobby.visibilityPrivateDesc
-                : t.lobby.visibilityPublicDesc}
-            </span>
-          </div>
-          {isHost ? (
-            <select
-              aria-label={t.lobby.visibilityAria}
-              value={settings.visibility}
-              disabled={!connected || busy}
-              onChange={(event) => update({ visibility: event.target.value as PartySettings["visibility"] })}
+        <div className="settings-header-controls">
+          {!isHost && <span className="sticker-badge sticker-badge--cyan">{t.lobby.hostOnly}</span>}
+          <div className="settings-view-switch" role="tablist" aria-label={t.lobby.settings}>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={settingsView === "general"}
+              className={`settings-view-tab${settingsView === "general" ? " is-active" : ""}`}
+              onClick={() => setSettingsView("general")}
             >
-              <option value="private">{t.lobby.privateLabel}</option>
-              <option value="public">{t.lobby.publicLabel}</option>
-            </select>
-          ) : (
-            <span className="setting-value">{settings.visibility === "private" ? t.lobby.privateLabel : t.lobby.publicLabel}</span>
-          )}
-        </div>
-
-        <div className="setting-row">
-          <div>
-            <strong>{t.lobby.questionReveal}</strong>
-            <span className="setting-description">{t.lobby.questionRevealDesc}</span>
-          </div>
-          {isHost ? (
-            <select
-              aria-label={t.lobby.questionRevealAria}
-              value={settings.questionRevealMode}
-              disabled={!connected || busy}
-              onChange={(event) =>
-                update({ questionRevealMode: event.target.value as PartySettings["questionRevealMode"] })
-              }
+              {t.lobby.generalSettings}
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={settingsView === "advanced"}
+              className={`settings-view-tab${settingsView === "advanced" ? " is-active" : ""}`}
+              onClick={() => setSettingsView("advanced")}
             >
-              <option value="ready">{t.lobby.everyoneReady}</option>
-              <option value="auto">{t.lobby.after8Seconds}</option>
-            </select>
-          ) : (
-            <span className="setting-value">
-              {settings.questionRevealMode === "ready" ? t.lobby.everyoneReady : t.lobby.after8Seconds}
-            </span>
-          )}
-        </div>
-
-        <div className="setting-row">
-          <div>
-            <strong>{t.lobby.spicyMode}</strong>
-            <span className="setting-description">
-              {(settings.spicyMode ?? false)
-                ? t.lobby.spicyOnDesc
-                : t.lobby.spicyOffDesc}
-            </span>
+              {t.lobby.advancedSettings}
+            </button>
           </div>
-          {isHost ? (
-            <select
-              aria-label={t.lobby.spicyModeAria}
-              value={(settings.spicyMode ?? false) ? "on" : "off"}
-              disabled={!connected || busy}
-              onChange={(event) => update({ spicyMode: event.target.value === "on" })}
-            >
-              <option value="off">{t.lobby.spicyOff}</option>
-              <option value="on">{t.lobby.spicyOn}</option>
-            </select>
-          ) : (
-            <span className="setting-value">
-              {(settings.spicyMode ?? false) ? t.lobby.spicyOn : t.lobby.spicyOff}
-            </span>
-          )}
-        </div>
-
-        <div className="setting-row">
-          <div>
-            <strong>{t.lobby.gameLanguage}</strong>
-            <span className="setting-description">{t.lobby.gameLanguageDesc}</span>
-          </div>
-          {isHost ? (
-            <select
-              aria-label={t.lobby.gameLanguageAria}
-              value={currentGameLanguage}
-              disabled={!connected || busy}
-              onChange={(event) => {
-                const nextLang = event.target.value as SupportedLanguage;
-                update({ language: nextLang });
-                setLang(nextLang);
-              }}
-            >
-              {LANGUAGE_OPTIONS.map((option) => (
-                <option key={option.code} value={option.code}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <span className="setting-value">
-              {LANGUAGE_OPTIONS.find((option) => option.code === currentGameLanguage)?.label ?? "English"}
-            </span>
-          )}
-        </div>
-
-        <div className="setting-row setting-row-topics-trigger">
-          <div>
-            <strong>{t.lobby.topicsLabel}</strong>
-            <span className="setting-description">{t.lobby.topicsDescription}</span>
-          </div>
-          <button
-            type="button"
-            className="secondary topics-open-button"
-            onClick={openTopicsModal}
-          >
-            {t.lobby.topicsLabel} ({savedTopics.length}/{TOPIC_IDS.length})
-          </button>
         </div>
       </div>
+
+      {settingsView === "general" ? (
+        <div className="settings-tiles">
+          <div className="setting-tile">
+            <div className="setting-tile-header">
+              <strong>{t.lobby.visibility}</strong>
+              <span className="setting-description">
+                {settings.visibility === "private"
+                  ? t.lobby.visibilityPrivateDesc
+                  : t.lobby.visibilityPublicDesc}
+              </span>
+            </div>
+            <div className="pill-group" role="group" aria-label={t.lobby.visibilityAria}>
+              {(["private", "public"] as const).map((mode) => {
+                const active = settings.visibility === mode;
+                return (
+                  <button
+                    key={mode}
+                    type="button"
+                    className={`pill-option${active ? " is-active" : ""}`}
+                    aria-pressed={active}
+                    disabled={!isHost || !connected || busy}
+                    onClick={() => update({ visibility: mode })}
+                  >
+                    {mode === "private" ? t.lobby.privateLabel : t.lobby.publicLabel}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="setting-tile">
+            <div className="setting-tile-header">
+              <strong>{t.lobby.answerTime}</strong>
+              <span className="setting-description">{t.lobby.answerTimeDesc}</span>
+            </div>
+            <div className="pill-group pill-group--compact" role="group" aria-label={t.lobby.answerTimeAria}>
+              {([30, 45, 60, 90, 120, 0] as const).map((seconds) => {
+                const current = settings.answerTimeSeconds ?? 60;
+                const active = current === seconds;
+                return (
+                  <button
+                    key={seconds}
+                    type="button"
+                    className={`pill-option${active ? " is-active" : ""}`}
+                    aria-pressed={active}
+                    disabled={!isHost || !connected || busy}
+                    onClick={() => update({ answerTimeSeconds: seconds })}
+                  >
+                    {seconds === 0 ? t.lobby.answerTimeOff : t.lobby.answerTimeSeconds(seconds)}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="setting-tile">
+            <div className="setting-tile-header">
+              <strong>{t.lobby.roundCount}</strong>
+              <span className="setting-description">{t.lobby.roundCountDesc}</span>
+            </div>
+            <div className="pill-group pill-group--compact" role="group" aria-label={t.lobby.roundCountAria}>
+              {([3, 5, 7, 10] as const).map((count) => {
+                const current = settings.roundCount ?? 5;
+                const active = current === count;
+                return (
+                  <button
+                    key={count}
+                    type="button"
+                    className={`pill-option${active ? " is-active" : ""}`}
+                    aria-pressed={active}
+                    disabled={!isHost || !connected || busy}
+                    onClick={() => update({ roundCount: count })}
+                  >
+                    {count}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="setting-tile">
+            <div className="setting-tile-header">
+              <strong>{t.lobby.questionReveal}</strong>
+              <span className="setting-description">{t.lobby.questionRevealDesc}</span>
+            </div>
+            <div className="pill-group" role="group" aria-label={t.lobby.questionRevealAria}>
+              {(["ready", "auto"] as const).map((mode) => {
+                const active = settings.questionRevealMode === mode;
+                return (
+                  <button
+                    key={mode}
+                    type="button"
+                    className={`pill-option${active ? " is-active" : ""}`}
+                    aria-pressed={active}
+                    disabled={!isHost || !connected || busy}
+                    onClick={() => update({ questionRevealMode: mode })}
+                  >
+                    {mode === "ready" ? t.lobby.everyoneReady : t.lobby.after8Seconds}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="setting-tile">
+            <div className="setting-tile-header">
+              <strong>{t.lobby.gameLanguage}</strong>
+              <span className="setting-description">{t.lobby.gameLanguageDesc}</span>
+            </div>
+            {isHost ? (
+              <select
+                aria-label={t.lobby.gameLanguageAria}
+                value={currentGameLanguage}
+                disabled={!connected || busy}
+                onChange={(event) => {
+                  const nextLang = event.target.value as SupportedLanguage;
+                  update({ language: nextLang });
+                  setLang(nextLang);
+                }}
+              >
+                {LANGUAGE_OPTIONS.map((option) => (
+                  <option key={option.code} value={option.code}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <span className="setting-value">
+                {LANGUAGE_OPTIONS.find((option) => option.code === currentGameLanguage)?.label ?? "English"}
+              </span>
+            )}
+          </div>
+
+          <div className="setting-tile">
+            <div className="setting-tile-header">
+              <strong>{t.lobby.topicsLabel}</strong>
+              <span className="setting-description">{t.lobby.topicsDescription}</span>
+            </div>
+            <button
+              type="button"
+              className="secondary topics-open-button"
+              onClick={openTopicsModal}
+            >
+              {t.lobby.topicsLabel} ({savedTopics.length}/{TOPIC_IDS.length})
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="settings-tiles">
+          <div className="setting-tile">
+            <div className="setting-tile-header">
+              <strong>{t.lobby.spicyMode}</strong>
+              <span className="setting-description">
+                {(settings.spicyMode ?? false)
+                  ? t.lobby.spicyOnDesc
+                  : t.lobby.spicyOffDesc}
+              </span>
+            </div>
+            <div className="pill-group" role="group" aria-label={t.lobby.spicyModeAria}>
+              {([false, true] as const).map((spicy) => {
+                const active = (settings.spicyMode ?? false) === spicy;
+                return (
+                  <button
+                    key={String(spicy)}
+                    type="button"
+                    className={`pill-option${active ? " is-active" : ""}${spicy && active ? " is-spicy" : ""}`}
+                    aria-pressed={active}
+                    disabled={!isHost || !connected || busy}
+                    onClick={() => update({ spicyMode: spicy })}
+                  >
+                    {spicy ? t.lobby.spicyOn : t.lobby.spicyOff}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {isTtsSupported() && (
+            <div className="setting-tile">
+              <div className="setting-tile-header">
+                <strong>{t.lobby.voiceSynthesizer}</strong>
+                <span className="setting-description">{t.lobby.voiceSynthesizerDesc}</span>
+              </div>
+              <div className="pill-group" role="group" aria-label={t.lobby.voiceSynthesizer}>
+                {([false, true] as const).map((on) => {
+                  const active = ttsEnabled === on;
+                  return (
+                    <button
+                      key={String(on)}
+                      type="button"
+                      className={`pill-option${active ? " is-active" : ""}`}
+                      aria-pressed={active}
+                      onClick={() => {
+                        if (ttsEnabled !== on) toggleTts();
+                      }}
+                    >
+                      {on ? t.lobby.spicyOn : t.lobby.spicyOff}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {topicsOpen && (
         <div
@@ -709,7 +823,10 @@ function LobbyView({
                 {t.lobby.hostedBy(host?.name ?? t.lobby.aPlayer, snapshot.players.length)}
               </p>
             </div>
-            <ConnectionStatus connected={connected} removed={Boolean(removedReason)} />
+            <div className="party-heading-actions">
+              <InviteLink code={snapshot.code} />
+              <ConnectionStatus connected={connected} removed={Boolean(removedReason)} />
+            </div>
           </section>
         </>
       )}
@@ -724,7 +841,7 @@ function LobbyView({
         </div>
       )}
       {error && (
-        <div className="notice error-notice" role="alert">
+        <div className="notice error-notice floating-error-toast" role="alert">
           <span>{describeApiError(error)}</span>
           <button className="quiet-button" type="button" onClick={clearError} aria-label={t.common.dismissError}>
             {t.common.dismiss}
@@ -746,7 +863,7 @@ function LobbyView({
               <div>
                 <p className="eyebrow">{t.lobby.whosAtTable}</p>
                 <h2>
-                  {t.lobby.squad} <span className="count-badge count-badge-lg">{snapshot.players.length}/6</span>
+                  {t.lobby.squad} <span className="count-badge count-badge-lg">{snapshot.players.length}/8</span>
                 </h2>
               </div>
               {isHost && <span className="sticker-badge">{t.lobby.youAreHost}</span>}
@@ -767,7 +884,6 @@ function LobbyView({
           </section>
 
           <aside className="lobby-sidebar">
-            <InviteLink code={snapshot.code} />
             <SettingsPanel
               settings={snapshot.settings}
               isHost={isHost}
@@ -818,9 +934,17 @@ export function PartyPage() {
 
   if (party.status === "invalid-code") {
     return (
-      <LoadingPage role="alert">
-        {t.lobby.invalidPartyCode} <Link to="/">{t.lobby.enterCodeFromHome}</Link>
-      </LoadingPage>
+      <main className="app-shell narrow-shell">
+        <TopBar />
+        <section className="card state-card not-found-card" role="alert">
+          <PlayerFace colorId="coral" mood="sus" size="lg" className="not-found-face" />
+          <span className="sticker-badge sticker-badge--coral">{t.common.brand}</span>
+          <h1 className="page-title">{t.lobby.invalidPartyCode}</h1>
+          <div className="button-row">
+            <Link className="primary link-button" to="/">{t.lobby.enterCodeFromHome}</Link>
+          </div>
+        </section>
+      </main>
     );
   }
   if (party.status === "loading") return <LoadingPage>{t.lobby.loadingParty}</LoadingPage>;
@@ -836,11 +960,11 @@ export function PartyPage() {
       <main className="app-shell narrow-shell">
         <TopBar />
         <section className="card state-card">
-          <p className="eyebrow">{t.lobby.oneSeatPerGuest}</p>
+          <span className="sticker-badge sticker-badge--cyan">{t.lobby.oneSeatPerGuest}</span>
           <h1 className="page-title">{t.lobby.alreadyInParty}</h1>
           <p>{t.lobby.alreadyInPartyBody(currentPartyCode)}</p>
           <div className="button-row">
-            <Link className="secondary link-button" to={`/party/${currentPartyCode}`}>
+            <Link className="primary link-button" to={`/party/${currentPartyCode}`}>
               {t.join.returnToCurrentParty}
             </Link>
             <button
@@ -851,11 +975,11 @@ export function PartyPage() {
             >
               {leavingOther ? t.lobby.leaving : currentParty.connected ? t.join.leaveCurrentParty : t.lobby.reconnectToLeave}
             </button>
+            <Link className="quiet-button link-button" to={`/join/${party.code}`}>{t.lobby.joinThisParty}</Link>
           </div>
           {currentParty.error && (
             <div className="notice error-notice" role="alert">{describeApiError(currentParty.error)}</div>
           )}
-          <Link className="text-link" to={`/join/${party.code}`}>{t.lobby.joinThisParty}</Link>
         </section>
       </main>
     );
@@ -866,11 +990,13 @@ export function PartyPage() {
       <main className="app-shell narrow-shell">
         <TopBar />
         <section className="card state-card">
-          <p className="eyebrow">{t.lobby.inviteRequired}</p>
+          <span className="sticker-badge sticker-badge--coral">{t.lobby.inviteRequired}</span>
           <h1 className="page-title">{t.lobby.notInParty}</h1>
           <p>{t.lobby.notInPartyBody}</p>
-          <Link className="primary link-button" to={`/join/${party.code}`}>{t.lobby.joinParty}</Link>
-          <Link className="text-link" to="/">{t.common.backToHome}</Link>
+          <div className="button-row">
+            <Link className="primary link-button" to={`/join/${party.code}`}>{t.lobby.joinParty}</Link>
+            <Link className="secondary link-button" to="/">{t.common.backToHome}</Link>
+          </div>
         </section>
       </main>
     );
@@ -878,11 +1004,18 @@ export function PartyPage() {
 
   if (!party.snapshot) {
     return (
-      <LoadingPage role="alert">
-        <span>{party.error ? describeApiError(party.error) : t.lobby.couldNotLoadParty}</span>
-        <button className="secondary" type="button" onClick={party.retry}>{t.common.tryAgain}</button>
-        <Link to="/">{t.common.backToHome}</Link>
-      </LoadingPage>
+      <main className="app-shell narrow-shell">
+        <TopBar />
+        <section className="card state-card not-found-card" role="alert">
+          <PlayerFace colorId="amber" mood="sus" size="lg" className="not-found-face" />
+          <span className="sticker-badge sticker-badge--coral">{t.common.brand}</span>
+          <h1 className="page-title">{party.error ? describeApiError(party.error) : t.lobby.couldNotLoadParty}</h1>
+          <div className="button-row">
+            <button className="primary" type="button" onClick={party.retry}>{t.common.tryAgain}</button>
+            <Link className="secondary link-button" to="/">{t.common.backToHome}</Link>
+          </div>
+        </section>
+      </main>
     );
   }
 

@@ -270,7 +270,7 @@ const CHARACTER_TOPICS: readonly TopicEntry[] = [
   { id: "big-d", angle: "weird", spicy: true, phrase: "has the biggest dick" },
   { id: "best-boobs", angle: "pos", spicy: true, phrase: "has the best boobs" },
   { id: "best-ass", angle: "pos", spicy: true, phrase: "has the best ass" },
-  { id: "smash", angle: "pos", spicy: true, phrase: "would you definitely sleep with" },
+  { id: "smash", angle: "pos", spicy: true, conflictGroup: "char_smash", phrase: "would you definitely sleep with" },
   { id: "bad-in-bed", angle: "neg", spicy: true, conflictGroup: "char_in_bed", phrase: "would be terrible in bed" },
   { id: "good-in-bed", angle: "pos", spicy: true, conflictGroup: "char_in_bed", phrase: "would be amazing in bed" },
 ];

@@ -9,7 +9,7 @@ import {
 } from "../shared/protocol";
 import type { PartyState } from "./model";
 
-const ColorIdSchema = z.enum(["coral", "amber", "mint", "cyan", "blue", "violet"]);
+const ColorIdSchema = z.enum(["coral", "amber", "mint", "cyan", "blue", "violet", "rose", "lime"]);
 const PlayerNameSchema = z.string().min(1).max(80).refine((name) => Array.from(name).length <= 20);
 const PartyDocumentSchema = z.object({
   id: z.string().uuid(),
@@ -27,6 +27,8 @@ const PartyDocumentSchema = z.object({
     spicyMode: z.boolean().optional(),
     language: z.enum(["en", "pl", "es", "de", "fr"]).optional(),
     enabledTopics: z.array(QuestionTopicIdSchema).min(1).optional(),
+    answerTimeSeconds: z.number().int().min(0).max(300).optional(),
+    roundCount: z.number().int().min(1).max(20).optional(),
   }).strict(),
   players: z.array(z.object({
     id: z.string().uuid(),
@@ -36,29 +38,35 @@ const PartyDocumentSchema = z.object({
     joinedAt: z.number().finite(),
     connected: z.boolean(),
     disconnectedAt: z.number().finite().nullable(),
-  }).strict()).min(1).max(6),
+    score: z.number().int().nonnegative().optional(),
+  }).strict()).min(1).max(8),
   customQuestions: z.array(z.object({
     id: z.string().min(1),
     normalQuestion: z.string().min(1).max(200),
     impostorQuestion: z.string().min(1).max(200),
   }).strict()).max(50),
   usedQuestionIds: z.array(z.string()),
+  usedNormalQuestions: z.array(z.string()).optional(),
   lastRoundNumber: z.number().int().nonnegative(),
   round: z.object({
     id: z.string().uuid(),
     number: z.number().int().positive(),
+    matchRound: z.number().int().positive().optional(),
+    isSpicy: z.boolean().optional(),
     participants: z.array(z.object({
       id: z.string().uuid(),
       name: PlayerNameSchema,
       colorId: ColorIdSchema,
-    }).strict()).min(1).max(6),
+    }).strict()).min(1).max(8),
     normalQuestion: z.string(),
     impostorQuestion: z.string(),
     impostorId: z.string().uuid(),
     answers: z.record(z.string(), z.string()),
     readyPlayerIds: z.array(z.string().uuid()),
     votes: z.record(z.string().uuid(), z.string().uuid()),
+    answerDeadlineAt: z.number().finite().nullable().optional(),
     questionRevealAt: z.number().finite().nullable(),
+    roundPoints: z.record(z.string().uuid(), z.number().int().nonnegative()).optional(),
   }).strict().nullable(),
   bannedSessionHashes: z.array(z.string().regex(/^[a-f0-9]{64}$/)),
   notice: z.object({ type: z.literal("round_cancelled"), playerName: z.string() }).strict().nullable(),

@@ -40,6 +40,7 @@ export const POP_QUESTION_ITEMS: readonly QuestionPoolItem[] = [
   { id: "pop-animals-27", pool: "animals", angle: "neg", shape: "pest_animal", text: "Most overrated animal?" },
   { id: "pop-animals-29", pool: "animals", angle: "neg", shape: "pest_animal", text: "What animal is the biggest menace to society?" },
   { id: "pop-animals-30", pool: "animals", angle: "neg", shape: "pest_animal", text: "What animal would you instantly delete from Earth?" },
+  { id: "pop-animals-31", pool: "animals", spicy: true, angle: "weird", shape: "general_animal", text: "What animal are you in bed?" },
 
   // =========================================================================
   // ACTING (10, in movies pool)

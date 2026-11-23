@@ -498,21 +498,27 @@ export function JoinPage() {
           </div>
         )}
         {!loading && session?.currentPartyCode === code && code && (
-          <div className="notice success-notice">
-            <span>{t.join.alreadySeatInParty}</span>
-            <Link className="secondary link-button" to={`/party/${code}`}>{t.home.returnToParty}</Link>
+          <div className="state-card-stack">
+            <div className="notice success-notice" role="status">
+              <span>{t.join.alreadySeatInParty}</span>
+            </div>
+            <div className="button-row">
+              <Link className="primary link-button" to={`/party/${code}`}>{t.home.returnToParty}</Link>
+            </div>
           </div>
         )}
         {!loading && session?.currentPartyCode && session.currentPartyCode !== code && (
-          <div className="notice">
-            <span>
-              {t.join.alreadyInOtherParty(session.currentPartyCode)}{" "}
-              {currentParty.connected ? t.join.connectedDot : t.join.reconnectingPaused}
-            </span>
+          <div className="state-card-stack">
+            <div className="notice" role="status">
+              <span>
+                {t.join.alreadyInOtherParty(session.currentPartyCode)}{" "}
+                {currentParty.connected ? t.join.connectedDot : t.join.reconnectingPaused}
+              </span>
+            </div>
             <div className="button-row">
-              <Link className="secondary link-button" to={`/party/${session.currentPartyCode}`}>{t.join.returnToCurrentParty}</Link>
+              <Link className="primary link-button" to={`/party/${session.currentPartyCode}`}>{t.join.returnToCurrentParty}</Link>
               {!currentParty.connected && !currentParty.removedReason && (
-                <button className="quiet-button" type="button" disabled={currentParty.busy} onClick={currentParty.retry}>
+                <button className="secondary" type="button" disabled={currentParty.busy} onClick={currentParty.retry}>
                   {t.common.retryConnection}
                 </button>
               )}

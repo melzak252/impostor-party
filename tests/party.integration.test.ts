@@ -133,7 +133,7 @@ test("a public party is discoverable only while its host has an authenticated so
     expect(field((await jsonRequest(app, "/api/parties")).body, "parties")).toEqual([]);
     const socket = await connectPartySocket(app, host.cookie, code);
     const listing = await jsonRequest(app, "/api/parties");
-    expect(field(listing.body, "parties")).toEqual([{ code, hostName: "Host", playerCount: 1, maxPlayers: 6 }]);
+    expect(field(listing.body, "parties")).toEqual([{ code, hostName: "Host", playerCount: 1, maxPlayers: 8 }]);
 
     await closePartySocket(socket);
     expect(field((await jsonRequest(app, "/api/parties")).body, "parties")).toEqual([]);
@@ -220,7 +220,7 @@ test("public discovery is minimal and colour conflicts and voluntary leave are a
     expect(hostSocket.readyState).toBe(WebSocket.OPEN);
 
     const listing = await jsonRequest(app, "/api/parties");
-    expect(field(listing.body, "parties")).toEqual([{ code, hostName: "Host", playerCount: 2, maxPlayers: 6 }]);
+    expect(field(listing.body, "parties")).toEqual([{ code, hostName: "Host", playerCount: 2, maxPlayers: 8 }]);
     expect(JSON.stringify(listing.body)).not.toContain("Guest");
 
     const colorConflict = await jsonRequest(app, `/api/parties/${code}/actions`, {
@@ -396,14 +396,14 @@ test("concurrent colour claims leave one unique owner", async () => {
   }
 });
 
-test("concurrent sixth-seat contenders serialize and same-session rejoin preserves identity", async () => {
+test("concurrent eighth-seat contenders serialize and same-session rejoin preserves identity", async () => {
   const directory = await mkdtemp(join(tmpdir(), "impostor-party-seat-race-"));
   const app = await createApp({ port: 0, hostname: "127.0.0.1", dbPath: join(directory, "party.sqlite") });
   try {
     const host = await makeSession(app);
     const created = await createParty(app, host.cookie, "Host", "private");
     const code = stringField(snapshot(created), "code");
-    const seatedGuests = await Promise.all(Array.from({ length: 4 }, () => makeSession(app)));
+    const seatedGuests = await Promise.all(Array.from({ length: 6 }, () => makeSession(app)));
     for (const guest of seatedGuests) {
       const joined = await jsonRequest(app, `/api/parties/${code}/join`, {
         method: "POST", cookie: guest.cookie, body: { name: "Guest" },
@@ -424,8 +424,8 @@ test("concurrent sixth-seat contenders serialize and same-session rejoin preserv
     });
     expect(rejoined.response.status).toBe(200);
     expect(stringField(snapshot(rejoined), "selfId")).toBe(winnerId);
-    expect(arrayField(snapshot(rejoined), "players")).toHaveLength(6);
-    expect(new Set(playerColors(snapshot(rejoined))).size).toBe(6);
+    expect(arrayField(snapshot(rejoined), "players")).toHaveLength(8);
+    expect(new Set(playerColors(snapshot(rejoined))).size).toBe(8);
 
     const seventh = await makeSession(app);
     const rejected = await jsonRequest(app, `/api/parties/${code}/join`, {
@@ -485,7 +485,7 @@ test("multiple tabs preserve presence and offline hosts transfer after grace", a
     now += 60_001;
     const publicListing = await jsonRequest(app, "/api/parties");
     const guestSnapshot = await jsonRequest(app, `/api/parties/${code}`, { cookie: guest.cookie });
-    expect(field(publicListing.body, "parties")).toEqual([{ code, hostName: "Guest", playerCount: 1, maxPlayers: 6 }]);
+    expect(field(publicListing.body, "parties")).toEqual([{ code, hostName: "Guest", playerCount: 1, maxPlayers: 8 }]);
     expect(stringField(snapshot(guestSnapshot), "hostId")).toBe(guestId);
     const expiredHost = await jsonRequest(app, `/api/parties/${code}`, { cookie: host.cookie });
     expect(expiredHost.response.status).toBe(403);
@@ -585,17 +585,13 @@ test("the automatic question reveal is exact, stale actions return a safe snapsh
 
     now = revealAt;
     const exact = await jsonRequest(app, `/api/parties/${code}`, { cookie: host.cookie });
-    expect(field(snapshot(exact), "phase")).toBe("question");
+    expect(field(snapshot(exact), "phase")).toBe("voting");
     expect(field(snapshot(exact), "round")).toHaveProperty("normalQuestion");
     const stale = await postAction(host.cookie, "answers", roundId, { type: "set_ready", ready: true });
     expect(stale.response.status).toBe(409);
     expect(errorCode(stale)).toBe("STALE_ACTION");
-    expect(field(stale.body, "snapshot")).toHaveProperty("phase", "question");
+    expect(field(stale.body, "snapshot")).toHaveProperty("phase", "voting");
 
-    for (const cookie of cookies) {
-      const ready = await postAction(cookie, "question", roundId, { type: "set_ready", ready: true });
-      expect(ready.response.status).toBe(200);
-    }
     const voting = await jsonRequest(app, `/api/parties/${code}`, { cookie: host.cookie });
     expect(field(snapshot(voting), "phase")).toBe("voting");
     const playerIds = arrayField(snapshot(voting), "players").map((player) => stringField(player, "id"));
@@ -686,12 +682,12 @@ test("an overdue persisted automatic reveal advances during app restart", async 
 
     const recovered = await jsonRequest(app, `/api/parties/${code}`, { cookie: host.cookie });
     const recoveredSnapshot = snapshot(recovered);
-    expect(field(recoveredSnapshot, "phase")).toBe("question");
+    expect(field(recoveredSnapshot, "phase")).toBe("voting");
     const recoveredRound = record(field(recoveredSnapshot, "round"));
     expect(stringField(recoveredRound, "id")).toBe(roundId);
     expect(stringField(recoveredRound, "privateQuestion")).toBe(impostorQuestion);
     expect(recoveredRound).toHaveProperty("normalQuestion");
-    expect(numberField(recoveredRound, "questionRevealAt")).toBe(revealAt);
+    expect(field(recoveredRound, "questionRevealAt")).toBeNull();
     expect(Object.values(record(field(recoveredRound, "answers")))).toEqual(["saved", "saved", "saved"]);
     expect(arrayField(recoveredSnapshot, "players").every((player) => field(player, "connected") === false)).toBe(true);
   } finally {

@@ -58,7 +58,7 @@ function randomIndex(context: PartyActionContext, maxExclusive: number): number 
   return selection;
 }
 
-function startRound(state: PartyState, context: PartyActionContext): void {
+function startRound(state: PartyState, context: PartyActionContext, mode: "start" | "next" | "skip" = "start"): void {
   if (state.players.length < 3 || state.players.length > 6 || state.players.some((player) => !context.connectedIds.has(player.id))) {
     throw new PartyError("NOT_READY", 409, "At least three players must be connected before the host can start a round.");
   }
@@ -69,20 +69,60 @@ function startRound(state: PartyState, context: PartyActionContext): void {
   }
 
   const usedQuestionIds = new Set(state.usedQuestionIds);
-  const unusedQuestions = availableQuestions.filter((pair) => !usedQuestionIds.has(pair.id));
-  const isResettingBag = unusedQuestions.length === 0;
-  const selectionPool = isResettingBag ? availableQuestions : unusedQuestions;
+  const usedNormalQuestions = new Set(state.usedNormalQuestions ?? []);
+  const freshNormalQuestions = availableQuestions.filter((pair) => !usedNormalQuestions.has(pair.normalQuestion));
+  const isResettingNormals = freshNormalQuestions.length === 0;
+  const normalPool = isResettingNormals ? availableQuestions : freshNormalQuestions;
+  const unusedPairsInPool = normalPool.filter((pair) => !usedQuestionIds.has(pair.id));
+  const isResettingBag = isResettingNormals || unusedPairsInPool.length === 0;
+  const selectionPool = unusedPairsInPool.length > 0 ? unusedPairsInPool : normalPool;
   const selectedPair = selectionPool[randomIndex(context, selectionPool.length)]!;
   const impostor = state.players[randomIndex(context, state.players.length)]!;
   const nextUsedQuestionIds = isResettingBag ? [] : [...state.usedQuestionIds];
   nextUsedQuestionIds.push(selectedPair.id);
+  const nextUsedNormalQuestions = isResettingNormals ? [] : [...(state.usedNormalQuestions ?? [])];
+  if (!nextUsedNormalQuestions.includes(selectedPair.normalQuestion)) {
+    nextUsedNormalQuestions.push(selectedPair.normalQuestion);
+  }
 
+  const totalRounds = state.settings.roundCount ?? 5;
+  const currentMatchRound = state.round?.matchRound ?? 1;
+  const matchRound =
+    mode === "start" ? 1 : mode === "next" ? currentMatchRound + 1 : currentMatchRound;
+  if (mode === "next" && matchRound > totalRounds) {
+    throw forbidden("All rounds in this match are complete. Return to the lobby to play again.");
+  }
+  if (mode === "start") {
+    for (const player of state.players) player.score = 0;
+  }
+
+  const friendlyPairIds = state.settings.spicyMode
+    ? new Set(
+        getBuiltinQuestionPairs(
+          false,
+          state.settings.language ?? "en",
+          state.settings.enabledTopics,
+        ).map((pair) => pair.id),
+      )
+    : null;
+  const isSpicy =
+    Boolean(state.settings.spicyMode) &&
+    state.settings.questionSource !== "custom" &&
+    !state.customQuestions.some((custom) => custom.id === selectedPair.id) &&
+    friendlyPairIds !== null &&
+    !friendlyPairIds.has(selectedPair.id);
+
+  const answerTimeSeconds = state.settings.answerTimeSeconds ?? 60;
+  const answerDeadlineAt = answerTimeSeconds > 0 ? context.now + answerTimeSeconds * 1000 : null;
   const number = state.lastRoundNumber + 1;
   state.lastRoundNumber = number;
   state.usedQuestionIds = nextUsedQuestionIds;
+  state.usedNormalQuestions = nextUsedNormalQuestions;
   state.round = {
     id: randomUUID(),
     number,
+    matchRound,
+    isSpicy,
     participants: state.players.map(({ id, name, colorId }) => ({ id, name, colorId })),
     normalQuestion: selectedPair.normalQuestion,
     impostorQuestion: selectedPair.impostorQuestion,
@@ -90,6 +130,7 @@ function startRound(state: PartyState, context: PartyActionContext): void {
     answers: {},
     readyPlayerIds: [],
     votes: {},
+    answerDeadlineAt,
     questionRevealAt: null,
   };
   state.phase = "answering";
@@ -111,6 +152,14 @@ function currentRound(state: PartyState, actorId: string): RoundState {
   return round;
 }
 
+const ANSWER_REVEAL_STEP_MS = 2_000;
+const AUTO_QUESTION_REVEAL_DELAY_MS = 8_000;
+
+function autoQuestionRevealAt(state: PartyState, round: RoundState, now: number): number | null {
+  if (state.settings.questionRevealMode !== "auto") return null;
+  return now + round.participants.length * ANSWER_REVEAL_STEP_MS + AUTO_QUESTION_REVEAL_DELAY_MS;
+}
+
 function transitionAfterReady(state: PartyState, round: RoundState, context: PartyActionContext): void {
   const allReady = round.participants.every((participant) => round.readyPlayerIds.includes(participant.id));
   if (!allReady) return;
@@ -121,11 +170,13 @@ function transitionAfterReady(state: PartyState, round: RoundState, context: Par
   round.readyPlayerIds = [];
   if (state.phase === "answering") {
     state.phase = "answers";
-    round.questionRevealAt = state.settings.questionRevealMode === "auto" ? context.now + 8_000 : null;
+    round.answerDeadlineAt = null;
+    round.questionRevealAt = autoQuestionRevealAt(state, round, context.now);
     return;
   }
   if (state.phase === "answers") {
-    state.phase = "question";
+    state.phase = "voting";
+    round.questionRevealAt = null;
     return;
   }
   if (state.phase === "question") {
@@ -136,6 +187,18 @@ function transitionAfterReady(state: PartyState, round: RoundState, context: Par
 
 function setReady(state: PartyState, actorId: string, ready: boolean, context: PartyActionContext): void {
   const round = currentRound(state, actorId);
+  if (state.phase === "answering") {
+    if (ready) {
+      if (!Object.hasOwn(round.answers, actorId)) {
+        throw new PartyError("NOT_READY", 409, "Submit an answer before locking in.");
+      }
+      if (!round.readyPlayerIds.includes(actorId)) round.readyPlayerIds.push(actorId);
+      transitionAfterReady(state, round, context);
+    } else {
+      round.readyPlayerIds = round.readyPlayerIds.filter((playerId) => playerId !== actorId);
+    }
+    return;
+  }
   if (state.phase === "answers" && state.settings.questionRevealMode !== "ready") {
     throw forbidden("The question is revealed automatically in this phase.");
   }
@@ -180,6 +243,21 @@ function submitVote(state: PartyState, actorId: string, targetPlayerId: string):
   }
   round.votes[actorId] = targetPlayerId;
   if (round.participants.every((participant) => Object.hasOwn(round.votes, participant.id))) {
+    const roundPoints: Record<string, number> = {};
+    for (const participant of round.participants) roundPoints[participant.id] = 0;
+    for (const participant of round.participants) {
+      if (participant.id === round.impostorId) continue;
+      if (round.votes[participant.id] === round.impostorId) {
+        roundPoints[participant.id] = (roundPoints[participant.id] ?? 0) + 1;
+      } else {
+        roundPoints[round.impostorId] = (roundPoints[round.impostorId] ?? 0) + 1;
+      }
+    }
+    for (const player of state.players) {
+      const gained = roundPoints[player.id] ?? 0;
+      if (gained > 0) player.score = (player.score ?? 0) + gained;
+    }
+    round.roundPoints = roundPoints;
     state.phase = "results";
     round.readyPlayerIds = [];
     round.questionRevealAt = null;
@@ -207,6 +285,7 @@ export function applyGameAction(
       const pair = normalizePair(action.normalQuestion, action.impostorQuestion);
       state.customQuestions.push({ id: randomUUID(), ...pair });
       state.usedQuestionIds = [];
+      state.usedNormalQuestions = [];
       return;
     }
     case "edit_question": {
@@ -217,6 +296,7 @@ export function applyGameAction(
       question.normalQuestion = pair.normalQuestion;
       question.impostorQuestion = pair.impostorQuestion;
       state.usedQuestionIds = [];
+      state.usedNormalQuestions = [];
       return;
     }
     case "delete_question": {
@@ -225,21 +305,22 @@ export function applyGameAction(
       if (questionIndex < 0) throw validationError("That custom question pair does not exist.");
       state.customQuestions.splice(questionIndex, 1);
       state.usedQuestionIds = [];
+      state.usedNormalQuestions = [];
       return;
     }
     case "start_round":
       requireLobbyHost(state, actorId);
-      startRound(state, context);
+      startRound(state, context, "start");
       return;
     case "skip_round":
       if (state.phase === "lobby" || !state.round) throw forbidden("There is no active round to skip.");
       if (actorId !== state.hostId) throw forbidden("Only the host can skip or reroll the round.");
-      startRound(state, context);
+      startRound(state, context, "skip");
       return;
     case "next_round":
       if (state.phase !== "results") throw forbidden("A next round can only start after results.");
       if (actorId !== state.hostId) throw forbidden("Only the host can start the next round.");
-      startRound(state, context);
+      startRound(state, context, "next");
       return;
     case "submit_answer":
       submitAnswer(state, actorId, action.answer, context);
@@ -263,10 +344,26 @@ export function applyGameAction(
 }
 
 export function advanceGameDeadline(state: PartyState, context: PartyActionContext): boolean {
-  if (state.phase !== "answers" || state.settings.questionRevealMode !== "auto" || !state.round) return false;
+  if (!state.round) return false;
+  if (state.phase === "answering") {
+    const deadlineAt = state.round.answerDeadlineAt ?? null;
+    if (deadlineAt === null || context.now < deadlineAt) return false;
+    for (const participant of state.round.participants) {
+      if (!Object.hasOwn(state.round.answers, participant.id)) {
+        state.round.answers[participant.id] = "—";
+      }
+    }
+    state.round.readyPlayerIds = [];
+    state.round.answerDeadlineAt = null;
+    state.phase = "answers";
+    state.round.questionRevealAt = autoQuestionRevealAt(state, state.round, context.now);
+    return true;
+  }
+  if (state.phase !== "answers" || state.settings.questionRevealMode !== "auto") return false;
   const revealAt = state.round.questionRevealAt;
   if (revealAt === null || context.now < revealAt) return false;
   state.round.readyPlayerIds = [];
-  state.phase = "question";
+  state.round.questionRevealAt = null;
+  state.phase = "voting";
   return true;
 }

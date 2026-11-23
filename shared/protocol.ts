@@ -53,14 +53,17 @@ export const PartySettingsSchema = z.object({
   spicyMode: z.boolean().optional(),
   language: GameLanguageSchema.optional(),
   enabledTopics: z.array(QuestionTopicIdSchema).min(1).optional(),
+  answerTimeSeconds: z.number().int().min(0).max(300).optional(),
+  roundCount: z.number().int().min(1).max(20).optional(),
 }).strict();
 export type PartySettings = z.infer<typeof PartySettingsSchema>;
-export const ColorIdSchema = z.enum(["coral", "amber", "mint", "cyan", "blue", "violet"]);
+export const ColorIdSchema = z.enum(["coral", "amber", "mint", "cyan", "blue", "violet", "rose", "lime"]);
 export type ColorId = z.infer<typeof ColorIdSchema>;
 export const COLOR_PALETTE: ReadonlyArray<{ id: ColorId; name: string; swatch: string }> = [
   { id: "coral", name: "Coral", swatch: "#F97066" }, { id: "amber", name: "Amber", swatch: "#FBBF24" },
   { id: "mint", name: "Mint", swatch: "#34D399" }, { id: "cyan", name: "Cyan", swatch: "#22D3EE" },
   { id: "blue", name: "Blue", swatch: "#60A5FA" }, { id: "violet", name: "Violet", swatch: "#A78BFA" },
+  { id: "rose", name: "Rose", swatch: "#FB7185" }, { id: "lime", name: "Lime", swatch: "#A3E635" },
 ];
 export const QuestionPairSchema = z.object({ id: z.string().min(1), normalQuestion: z.string(), impostorQuestion: z.string() }).strict();
 export type QuestionPair = z.infer<typeof QuestionPairSchema>;
@@ -85,11 +88,12 @@ export const PartyActionSchema = z.discriminatedUnion("type", actionSchemas);
 export type PartyAction = z.infer<typeof PartyActionSchema>;
 export const ActionRequestSchema = z.object({ expectedPhase: PhaseSchema, roundId: z.string().uuid().nullable(), action: PartyActionSchema }).strict();
 export type ActionRequest = z.infer<typeof ActionRequestSchema>;
-export interface PlayerSnapshot { id: string; name: string; colorId: ColorId; connected: boolean; hasAnswered: boolean; isReady: boolean; hasVoted: boolean }
+export interface PlayerSnapshot { id: string; name: string; colorId: ColorId; connected: boolean; hasAnswered: boolean; isReady: boolean; hasVoted: boolean; score: number }
 export interface RoundSnapshot {
-  id: string; number: number; participants: Array<{ id: string; name: string; colorId: ColorId }>;
-  privateQuestion: string; myAnswer: string | null; myVote: string | null; questionRevealAt: number | null;
+  id: string; number: number; matchRound: number; totalRounds: number; isSpicy: boolean; participants: Array<{ id: string; name: string; colorId: ColorId }>;
+  privateQuestion: string; myAnswer: string | null; myVote: string | null; answerDeadlineAt: number | null; questionRevealAt: number | null;
   answers?: Record<string, string>; normalQuestion?: string; impostorQuestion?: string; impostorId?: string; votes?: Record<string, string>;
+  roundPoints?: Record<string, number>;
 }
 export interface PartySnapshot {
   code: string; roomName?: string; version: number; phase: Phase; hostId: string; selfId: string; settings: PartySettings;

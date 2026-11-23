@@ -8,7 +8,7 @@ import { pitchForParticipantIndex, speakText, stopSpeaking, useTtsEnabled } from
 
 type ActiveRound = NonNullable<PartySnapshot["round"]>;
 type RoundParticipant = ActiveRound["participants"][number];
-const QUESTION_DRAW_DURATION_MS = 1_600;
+const QUESTION_DRAW_DURATION_MS = 1_200;
 const ANSWER_REVEAL_STEP_MS = 2_000;
 const ANSWER_REVEAL_STEP_SECONDS = ANSWER_REVEAL_STEP_MS / 1_000;
 
@@ -221,6 +221,28 @@ function AnswerList({
   );
 }
 
+function SpicyFlames() {
+  return (
+    <div className="spicy-flames" aria-hidden="true">
+      {["tl", "tr", "bl", "br"].map((pos) => (
+        <svg key={pos} className={`spicy-flame spicy-flame--${pos}`} viewBox="0 0 24 28" width="22" height="26">
+          <path
+            d="M12 2 C14 7 19 9 19 16 C19 21 15.8 25 12 25 C8.2 25 5 21 5 16 C5 12 7.5 9.5 8.5 7.5 C9.2 9.5 10.5 10 11 8 C11.5 6 11.5 4 12 2 Z"
+            fill="#FF5A5F"
+            stroke="#1A103D"
+            strokeWidth="2"
+            strokeLinejoin="round"
+          />
+          <path
+            d="M12 12 C13.5 15 15 16.5 15 19 C15 21.2 13.7 22.8 12 22.8 C10.3 22.8 9 21.2 9 19 C9 16.8 10.5 15 12 12 Z"
+            fill="#FFD43B"
+          />
+        </svg>
+      ))}
+    </div>
+  );
+}
+
 function QuestionCard({ round, revealed }: { round: ActiveRound; revealed: boolean }) {
   const [lang] = useLanguage();
   const t = getStrings(lang);
@@ -265,6 +287,7 @@ export function Round({
   const [selectedVote, setSelectedVote] = useState<string | null>(null);
   const [countdownNow, setCountdownNow] = useState(() => Date.now());
   const [questionDrawnRoundId, setQuestionDrawnRoundId] = useState<string | null>(null);
+  const [resultsSettledRoundId, setResultsSettledRoundId] = useState<string | null>(null);
   const [answerReveal, setAnswerReveal] = useState({
     roundId: null as string | null,
     count: 0,
@@ -278,37 +301,46 @@ export function Round({
   }, [round?.id, snapshot.phase]);
 
   useEffect(() => {
-    const revealAt = round?.questionRevealAt;
-    if (
-      snapshot.phase !== "answers" ||
-      snapshot.settings.questionRevealMode !== "auto" ||
-      revealAt === null ||
-      revealAt === undefined
-    ) {
+    if (!round || snapshot.phase !== "results") {
+      setResultsSettledRoundId(null);
+      return;
+    }
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setResultsSettledRoundId(round.id);
+      return;
+    }
+    setResultsSettledRoundId(null);
+    const timer = window.setTimeout(() => setResultsSettledRoundId(round.id), 550);
+    return () => window.clearTimeout(timer);
+  }, [round?.id, snapshot.phase]);
+
+  useEffect(() => {
+    const answerDeadline = snapshot.phase === "answering" ? round?.answerDeadlineAt : null;
+    const revealAt =
+      snapshot.phase === "answers" && snapshot.settings.questionRevealMode === "auto"
+        ? round?.questionRevealAt
+        : null;
+    const activeDeadline = answerDeadline ?? revealAt;
+    if (activeDeadline === null || activeDeadline === undefined) {
       return;
     }
     const updateCountdown = () => setCountdownNow(Date.now());
     updateCountdown();
     const timer = window.setInterval(updateCountdown, 1_000);
     return () => window.clearInterval(timer);
-  }, [round?.id, round?.questionRevealAt, snapshot.phase, snapshot.settings.questionRevealMode]);
+  }, [round?.id, round?.answerDeadlineAt, round?.questionRevealAt, snapshot.phase, snapshot.settings.questionRevealMode]);
 
   useEffect(() => {
     if (!round || snapshot.phase !== "answering") {
       setQuestionDrawnRoundId(null);
       return;
     }
-
-    setQuestionDrawnRoundId(null);
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       setQuestionDrawnRoundId(round.id);
       return;
     }
-
-    const timer = window.setTimeout(
-      () => setQuestionDrawnRoundId(round.id),
-      QUESTION_DRAW_DURATION_MS,
-    );
+    setQuestionDrawnRoundId(null);
+    const timer = window.setTimeout(() => setQuestionDrawnRoundId(round.id), QUESTION_DRAW_DURATION_MS);
     return () => window.clearTimeout(timer);
   }, [round?.id, snapshot.phase]);
 
@@ -367,7 +399,7 @@ export function Round({
       return;
     }
 
-    if (snapshot.phase === "question" && round.normalQuestion) {
+    if ((snapshot.phase === "question" || snapshot.phase === "voting") && round.normalQuestion) {
       const key = `${round.id}:question`;
       if (lastSpokenKeyRef.current !== key) {
         lastSpokenKeyRef.current = key;
@@ -422,13 +454,19 @@ export function Round({
       ? Object.keys(round.votes ?? {}).length
       : roster.filter((participant) => playerById.get(participant.id)?.hasVoted).length;
   const isReady = me?.isReady ?? false;
+  const answerSeconds =
+    round.answerDeadlineAt === null || round.answerDeadlineAt === undefined
+      ? null
+      : Math.max(0, Math.ceil((round.answerDeadlineAt - countdownNow) / 1_000));
   const revealSeconds =
     round.questionRevealAt === null
       ? null
       : Math.max(0, Math.ceil((round.questionRevealAt - countdownNow) / 1_000));
   const progressLabel =
     snapshot.phase === "answering"
-      ? t.round.lockedInProgress(answeredCount, roster.length)
+      ? answerSeconds !== null
+        ? `${t.round.lockedInProgress(answeredCount, roster.length)} · ${t.round.answerTimerLeft(answerSeconds)}`
+        : t.round.lockedInProgress(answeredCount, roster.length)
       : snapshot.phase === "answers"
         ? snapshot.settings.questionRevealMode === "auto"
           ? revealSeconds === null
@@ -442,7 +480,7 @@ export function Round({
 
   const submitAnswer = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!answerDraft.trim() || !connected || busy || isReady || questionDrawnRoundId !== round.id) {
+    if (!answerDraft.trim() || !connected || busy || isReady) {
       return;
     }
     const action: PartyAction = { type: "submit_answer", answer: answerDraft };
@@ -452,7 +490,7 @@ export function Round({
   const answerProgress = (participantId: string): string | null => {
     const player = playerById.get(participantId);
     if (snapshot.phase === "answering") {
-      return player?.hasAnswered ? t.round.answerSubmitted : t.round.waiting;
+      return player?.isReady ? t.round.answerSubmitted : t.round.waiting;
     }
     return null;
   };
@@ -526,7 +564,7 @@ export function Round({
       <section className="card round-heading-card">
         <div>
           <p className="eyebrow">
-            {t.round.roundLabel(round.number, phaseName)}
+            {t.round.roundLabel(round.matchRound, phaseName)} ({round.matchRound}/{round.totalRounds})
           </p>
           <h2>{phaseName}</h2>
         </div>
@@ -548,7 +586,7 @@ export function Round({
                   colorId={participant.colorId}
                   isHost={participant.id === snapshot.hostId}
                   offline={player ? !player.connected : false}
-                  mood={player?.hasAnswered ? "happy" : "default"}
+                  mood={player?.isReady ? "happy" : "default"}
                   size="lg"
                 />
                 <span className="round-progress-copy">
@@ -573,7 +611,7 @@ export function Round({
           <div
             className={`private-question-flip${
               questionDrawnRoundId === round.id ? " is-drawn" : " is-shuffling"
-            }`}
+            }${round.isSpicy ? " is-spicy-card" : ""}`}
           >
             <div
               className="private-question-face private-question-back"
@@ -592,14 +630,15 @@ export function Round({
               className="private-question-face private-question-front"
               aria-hidden={questionDrawnRoundId !== round.id}
             >
+              {round.isSpicy && (
+                <>
+                  <SpicyFlames />
+                  <span className="spicy-question-tag">{t.round.spicyQuestionBadge}</span>
+                </>
+              )}
               <h2>{round.privateQuestion}</h2>
             </div>
           </div>
-          <p className="question-draw-status" role="status" aria-live="polite">
-            {questionDrawnRoundId === round.id
-              ? t.round.promptLive
-              : t.round.shufflingCard}
-          </p>
           <form className="answer-form" onSubmit={submitAnswer}>
             <label className="field-label" htmlFor="round-answer">
               {t.round.yourAnswer}
@@ -610,7 +649,7 @@ export function Round({
               value={answerDraft}
               maxLength={80}
               autoComplete="off"
-              disabled={!connected || busy || isReady || questionDrawnRoundId !== round.id}
+              disabled={!connected || busy || isReady}
               onChange={(event) => setAnswerState({ roundId: round.id, value: event.target.value })}
               placeholder={t.round.answerPlaceholder}
               aria-describedby="answer-help"
@@ -625,18 +664,27 @@ export function Round({
                 !connected ||
                 busy ||
                 isReady ||
-                questionDrawnRoundId !== round.id ||
                 !answerDraft.trim()
               }
             >
               {isReady ? t.round.answerLocked : t.round.submitAnswer}
             </button>
+            {isReady && (
+              <div className="answer-locked-actions">
+                <p className="muted small-copy" role="status">
+                  {t.round.answerLockedStatus}
+                </p>
+                <button
+                  className="secondary"
+                  type="button"
+                  disabled={!connected || busy}
+                  onClick={toggleReady}
+                >
+                  {t.round.editAnswer}
+                </button>
+              </div>
+            )}
           </form>
-          {isReady && (
-            <p className="muted small-copy" role="status">
-              {t.round.answerLockedStatus}
-            </p>
-          )}
         </section>
       )}
 
@@ -670,17 +718,66 @@ export function Round({
               </div>
             )}
 
-            <QuestionCard round={round} revealed={snapshot.phase !== "answers"} />
-
-            {snapshot.phase === "results" && (
-              <section
-                className="card round-impostor-question-card"
-                aria-label={t.round.impostorsQuestionAria}
-              >
-                <p className="eyebrow">{t.round.impostorsQuestion}</p>
-                <p className="round-impostor-question-text">{round.impostorQuestion}</p>
+            {snapshot.phase === "results" ? (
+              <section className="card round-question-card round-questions-box" aria-label={t.round.sharedQuestionAria}>
+                <div className="round-question-part">
+                  <p className="eyebrow">{t.round.theRealQuestion}</p>
+                  <h2>{round.normalQuestion}</h2>
+                </div>
+                <div className="round-impostor-reveal-part is-revealing" aria-label={t.round.impostorsQuestionAria}>
+                  <p className="eyebrow">{t.round.impostorsQuestion}</p>
+                  <p className="round-impostor-question-text">{round.impostorQuestion}</p>
+                </div>
               </section>
+            ) : (
+              <QuestionCard round={round} revealed={snapshot.phase !== "answers"} />
             )}
+
+            {snapshot.phase === "results" && (() => {
+              const settled = resultsSettledRoundId === round.id;
+              const withScores = roster.map((participant, index) => {
+                const totalScore = playerById.get(participant.id)?.score ?? 0;
+                const gained = round.roundPoints?.[participant.id] ?? 0;
+                const prevScore = Math.max(0, totalScore - gained);
+                return { participant, index, totalScore, gained, prevScore };
+              });
+              const prevSorted = [...withScores].sort((a, b) => b.prevScore - a.prevScore || a.index - b.index);
+              const nextSorted = [...withScores].sort((a, b) => b.totalScore - a.totalScore || a.index - b.index);
+              const prevRankById = new Map(prevSorted.map((entry, rank) => [entry.participant.id, rank]));
+              const activeRows = settled ? nextSorted : prevSorted;
+              return (
+                <section className={`card round-leaderboard-card${settled ? " is-settled" : ""}`} aria-label={t.round.leaderboard}>
+                  <p className="eyebrow">{t.round.leaderboard}</p>
+                  <ol className="round-leaderboard-list">
+                    {activeRows.map((entry, newRank) => {
+                      const prevRank = prevRankById.get(entry.participant.id) ?? newRank;
+                      const rankShift = settled ? prevRank - newRank : 0;
+                      const displayedScore = settled ? entry.totalScore : entry.prevScore;
+                      return (
+                        <li
+                          key={entry.participant.id}
+                          className={`round-leaderboard-row${settled && entry.gained > 0 ? " is-gained" : ""}${rankShift > 0 ? " is-climbed" : ""}`}
+                          style={playerColor(entry.participant.colorId)}
+                        >
+                          <span className="round-leaderboard-player">
+                            <span className="round-leaderboard-rank">#{newRank + 1}</span>
+                            <PlayerFace colorId={entry.participant.colorId} isHost={entry.participant.id === snapshot.hostId} size="sm" />
+                            <strong>{entry.participant.name}{entry.participant.id === snapshot.selfId ? t.common.youSuffix : ""}</strong>
+                            {rankShift > 0 && <span className="round-rank-shift">↑{rankShift}</span>}
+                          </span>
+                          <span className="round-leaderboard-scores">
+                            {settled && entry.gained > 0 && (
+                              <span className="round-points-gained">{t.round.pointsEarned(entry.gained)}</span>
+                            )}
+                            <span className="round-points-total">{t.lobby.scoreBadge(displayedScore)}</span>
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ol>
+                </section>
+              );
+            })()}
 
             {snapshot.phase === "answers" &&
               (snapshot.settings.questionRevealMode === "auto" ? (
@@ -713,24 +810,6 @@ export function Round({
                   </button>
                 </div>
               ))}
-
-            {snapshot.phase === "question" && (
-              <div className="card ready-control round-gate-control">
-                <p>
-                  {isReady
-                    ? t.round.lockedInForVoting
-                    : t.round.roastAnswersPrompt}
-                </p>
-                <button
-                  className={isReady ? "secondary" : "primary"}
-                  type="button"
-                  disabled={!connected || busy}
-                  onClick={toggleReady}
-                >
-                  {isReady ? t.round.notReady : readinessLabel}
-                </button>
-              </div>
-            )}
 
             {snapshot.phase === "voting" && (
               <div className="card round-vote-bar">
@@ -833,22 +912,24 @@ export function Round({
         )}
         {snapshot.phase === "results" && snapshot.selfId === snapshot.hostId && (
           <>
+            {round.matchRound < round.totalRounds && (
+              <button
+                className="primary"
+                type="button"
+                disabled={
+                  !connected ||
+                  busy ||
+                  snapshot.players.length < 3 ||
+                  snapshot.players.length > 8 ||
+                  snapshot.players.some((player) => !player.connected)
+                }
+                onClick={() => void act({ type: "next_round" })}
+              >
+                {t.round.nextRound}
+              </button>
+            )}
             <button
-              className="primary"
-              type="button"
-              disabled={
-                !connected ||
-                busy ||
-                snapshot.players.length < 3 ||
-                snapshot.players.length > 6 ||
-                snapshot.players.some((player) => !player.connected)
-              }
-              onClick={() => void act({ type: "next_round" })}
-            >
-              {t.round.nextRound}
-            </button>
-            <button
-              className="secondary"
+              className={round.matchRound >= round.totalRounds ? "primary" : "secondary"}
               type="button"
               disabled={!connected || busy}
               onClick={() => void act({ type: "return_to_lobby" })}
