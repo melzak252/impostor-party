@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const APP_VERSION = "1.2.0";
+export const APP_VERSION = "1.3.0";
 
 export const PhaseSchema = z.enum(["lobby", "answering", "answers", "question", "voting", "results"]);
 export type Phase = z.infer<typeof PhaseSchema>;
