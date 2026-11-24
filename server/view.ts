@@ -41,12 +41,17 @@ export function projectParty(state: PartyState, viewerId: string, connectedIds: 
     matchRound: round.matchRound ?? 1,
     totalRounds,
     isSpicy: Boolean(round.isSpicy),
+    canVote: viewer.id !== round.impostorId,
     participants: round.participants.map((participant) => ({ ...participant })),
     privateQuestion: viewer.id === round.impostorId ? round.impostorQuestion : round.normalQuestion,
     myAnswer: Object.hasOwn(round.answers, viewer.id) ? round.answers[viewer.id]! : null,
     myVote: Object.hasOwn(round.votes, viewer.id) ? round.votes[viewer.id]! : null,
     answerDeadlineAt: round.answerDeadlineAt ?? null,
     questionRevealAt: round.questionRevealAt,
+    voteDeadlineAt: round.voteDeadlineAt ?? null,
+    rerollVotes: round.rerollVoterIds?.length ?? 0,
+    rerollThreshold: Math.max(1, round.participants.length - 1),
+    myRerollVote: Boolean(round.rerollVoterIds?.includes(viewer.id)),
   };
 
   if (state.phase === "answers" || state.phase === "question" || state.phase === "voting" || state.phase === "results") {

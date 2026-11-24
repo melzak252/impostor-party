@@ -388,12 +388,16 @@ export interface TranslationStrings {
     playerGeneric: string;
     tapAnswerToPick: string;
     lockInVote: string;
+    impostorCantVote: string;
+    votesLockIn: (seconds: number) => string;
     allCardsFlipped: string;
     flippingCardOf: (current: number, total: number) => string;
     readyForRealQ: string;
     oneCardPerSec: string;
     votingInstruction: string;
     skipRerollRound: string;
+    rerollVote: (votes: number, needed: number) => string;
+    rerollVoted: (votes: number, needed: number) => string;
     nextRound: string;
     backToLobby: string;
   };
@@ -717,12 +721,16 @@ const en: TranslationStrings = {
     playerGeneric: "player",
     tapAnswerToPick: "Tap a player's card to select them.",
     lockInVote: "Lock in vote",
+    impostorCantVote: "You are the impostor. Sit tight while everyone else votes!",
+    votesLockIn: (seconds: number) => `All votes in! Locking in ${seconds}s...`,
     allCardsFlipped: "All cards flipped!",
     flippingCardOf: (current, total) => `Flipping card ${current} of ${total}…`,
     readyForRealQ: "Ready for the real question",
     oneCardPerSec: "1 card / 2 sec",
     votingInstruction: "Pick the player you think had the fake prompt, then lock in your vote.",
     skipRerollRound: "Skip / Reroll round",
+    rerollVote: (votes, needed) => `Reroll question (${votes}/${needed})`,
+    rerollVoted: (votes, needed) => `Reroll voted (${votes}/${needed})`,
     nextRound: "Next round",
     backToLobby: "Back to lobby",
   },
@@ -1045,12 +1053,16 @@ const pl: TranslationStrings = {
     playerGeneric: "gracza",
     tapAnswerToPick: "Kliknij kartę odpowiedzi, aby wskazać podejrzanego.",
     lockInVote: "Zatwierdź głos",
+    impostorCantVote: "Jesteś impostorem. Czekaj spokojnie, aż reszta zagłosuje!",
+    votesLockIn: (seconds: number) => `Wszyscy zagłosowali! Blokada za ${seconds} s...`,
     allCardsFlipped: "Wszystkie karty odkryte!",
     flippingCardOf: (current, total) => `Odkrywanie karty ${current} z ${total}…`,
     readyForRealQ: "Gotowi na prawdziwe pytanie",
     oneCardPerSec: "1 karta / 2 s",
     votingInstruction: "Wybierz gracza, który Twoim zdaniem miał inne pytanie, i zatwierdź głos.",
     skipRerollRound: "Pomiń / Nowa runda",
+    rerollVote: (votes, needed) => `Zmień pytanie (${votes}/${needed})`,
+    rerollVoted: (votes, needed) => `Chcesz zmiany (${votes}/${needed})`,
     nextRound: "Następna runda",
     backToLobby: "Powrót do lobby",
   },
@@ -1373,12 +1385,16 @@ const es: TranslationStrings = {
     playerGeneric: "jugador",
     tapAnswerToPick: "Toca una tarjeta de respuesta para elegir al sospechoso.",
     lockInVote: "Confirmar voto",
+    impostorCantVote: "Eres el impostor. ¡Espera mientras los demás votan!",
+    votesLockIn: (seconds: number) => `¡Todos votaron! Se cierra en ${seconds} s...`,
     allCardsFlipped: "¡Todas las cartas reveladas!",
     flippingCardOf: (current, total) => `Revelando carta ${current} de ${total}…`,
     readyForRealQ: "Listos para la pregunta real",
     oneCardPerSec: "1 carta / 2 seg",
     votingInstruction: "Elige al jugador que crees que tuvo la pregunta falsa y confirma tu voto.",
     skipRerollRound: "Saltar / Repetir ronda",
+    rerollVote: (votes, needed) => `Cambiar pregunta (${votes}/${needed})`,
+    rerollVoted: (votes, needed) => `Votado cambiar (${votes}/${needed})`,
     nextRound: "Siguiente ronda",
     backToLobby: "Volver al lobby",
   },
@@ -1701,12 +1717,16 @@ const de: TranslationStrings = {
     playerGeneric: "Spieler",
     tapAnswerToPick: "Tippe auf eine Antwortkarte, um jemanden zu verdächtigen.",
     lockInVote: "Stimme abgeben",
+    impostorCantVote: "Du bist der Impostor. Warte, bis die anderen abgestimmt haben!",
+    votesLockIn: (seconds: number) => `Alle haben gewählt! Sperre in ${seconds} s...`,
     allCardsFlipped: "Alle Karten aufgedeckt!",
     flippingCardOf: (current, total) => `Decke Karte ${current} von ${total} auf…`,
     readyForRealQ: "Bereit für die echte Frage",
     oneCardPerSec: "1 Karte / 2 Sek.",
     votingInstruction: "Wähle die Person, die vermutlich die falsche Frage hatte, und gib deine Stimme ab.",
     skipRerollRound: "Runde überspringen",
+    rerollVote: (votes, needed) => `Frage neu würfeln (${votes}/${needed})`,
+    rerollVoted: (votes, needed) => `Für Neu-Wurf (${votes}/${needed})`,
     nextRound: "Nächste Runde",
     backToLobby: "Zurück zur Lobby",
   },
@@ -2029,12 +2049,16 @@ const fr: TranslationStrings = {
     playerGeneric: "joueur",
     tapAnswerToPick: "Touche une carte de réponse pour désigner le suspect.",
     lockInVote: "Confirmer le vote",
+    impostorCantVote: "Tu es l'imposteur. Patiente pendant que les autres votent !",
+    votesLockIn: (seconds: number) => `Tous les votes sont là ! Verrouillage dans ${seconds} s...`,
     allCardsFlipped: "Toutes les cartes sont révélées !",
     flippingCardOf: (current, total) => `Révélation de la carte ${current} sur ${total}…`,
     readyForRealQ: "Prêts pour la vraie question",
     oneCardPerSec: "1 carte / 2 sec",
     votingInstruction: "Choisis la personne qui avait selon toi la fausse question, puis confirme ton vote.",
     skipRerollRound: "Passer / Relancer",
+    rerollVote: (votes, needed) => `Changer la question (${votes}/${needed})`,
+    rerollVoted: (votes, needed) => `Vote pour changer (${votes}/${needed})`,
     nextRound: "Manche suivante",
     backToLobby: "Retour au salon",
   },

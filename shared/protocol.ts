@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const APP_VERSION = "1.3.0";
+export const APP_VERSION = "1.3.1";
 
 export const PhaseSchema = z.enum(["lobby", "answering", "answers", "question", "voting", "results"]);
 export type Phase = z.infer<typeof PhaseSchema>;
@@ -80,7 +80,9 @@ const actionSchemas = [
   z.object({ type: z.literal("skip_round") }).strict(),
   z.object({ type: z.literal("next_round") }).strict(),
   z.object({ type: z.literal("submit_answer"), answer: z.string() }).strict(),
+  z.object({ type: z.literal("save_draft"), answer: z.string() }).strict(),
   z.object({ type: z.literal("set_ready"), ready: z.boolean() }).strict(),
+  z.object({ type: z.literal("vote_reroll") }).strict(),
   z.object({ type: z.literal("vote"), targetPlayerId: z.string().uuid() }).strict(),
   z.object({ type: z.literal("return_to_lobby") }).strict(),
 ] as const;
@@ -90,8 +92,9 @@ export const ActionRequestSchema = z.object({ expectedPhase: PhaseSchema, roundI
 export type ActionRequest = z.infer<typeof ActionRequestSchema>;
 export interface PlayerSnapshot { id: string; name: string; colorId: ColorId; connected: boolean; hasAnswered: boolean; isReady: boolean; hasVoted: boolean; score: number }
 export interface RoundSnapshot {
-  id: string; number: number; matchRound: number; totalRounds: number; isSpicy: boolean; participants: Array<{ id: string; name: string; colorId: ColorId }>;
-  privateQuestion: string; myAnswer: string | null; myVote: string | null; answerDeadlineAt: number | null; questionRevealAt: number | null;
+  id: string; number: number; matchRound: number; totalRounds: number; isSpicy: boolean; canVote: boolean; participants: Array<{ id: string; name: string; colorId: ColorId }>;
+  privateQuestion: string; myAnswer: string | null; myVote: string | null; answerDeadlineAt: number | null; questionRevealAt: number | null; voteDeadlineAt: number | null;
+  rerollVotes: number; rerollThreshold: number; myRerollVote: boolean;
   answers?: Record<string, string>; normalQuestion?: string; impostorQuestion?: string; impostorId?: string; votes?: Record<string, string>;
   roundPoints?: Record<string, number>;
 }

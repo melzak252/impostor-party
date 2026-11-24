@@ -4,7 +4,7 @@ export interface PlayerState { id: string; sessionHash: string; name: string; co
 export interface RoundState {
   id: string; number: number; matchRound?: number; isSpicy?: boolean; participants: Array<{ id: string; name: string; colorId: ColorId }>;
   normalQuestion: string; impostorQuestion: string; impostorId: string; answers: Record<string, string>;
-  readyPlayerIds: string[]; votes: Record<string, string>; answerDeadlineAt?: number | null; questionRevealAt: number | null;
+  readyPlayerIds: string[]; rerollVoterIds?: string[]; votes: Record<string, string>; answerDeadlineAt?: number | null; questionRevealAt: number | null; voteDeadlineAt?: number | null;
   roundPoints?: Record<string, number>;
 }
 export interface PartyState {

@@ -1,9 +1,16 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type FormEvent } from "react";
 import { COLOR_PALETTE, type PartySnapshot } from "../shared/protocol";
-import type { PartyAction } from "./api";
+import { sendAction, type PartyAction } from "./api";
 import { getStrings, useLanguage } from "./i18n";
 import type { UsePartyResult } from "./useParty";
 import { PlayerFace } from "./PlayerFace";
+import {
+  playCardFlipSound,
+  playCardSpinSound,
+  playCountdownTick,
+  playResultsRevealSound,
+  playVoteSound,
+} from "./sfx";
 import { pitchForParticipantIndex, speakText, stopSpeaking, useTtsEnabled } from "./tts";
 
 type ActiveRound = NonNullable<PartySnapshot["round"]>;
@@ -41,8 +48,8 @@ function FittedAnswerText({ text }: { text: string }) {
       const availHeight = box.clientHeight - padY;
       if (availWidth <= 0 || availHeight <= 0) return;
 
-      const minSize = 11;
-      const maxSize = Math.max(minSize, Math.min(120, Math.floor(availHeight * 0.9)));
+      const minSize = 12;
+      const maxSize = Math.max(minSize, Math.min(32, Math.floor(availHeight * 0.55)));
       let low = minSize;
       let high = maxSize;
       let best = minSize;
@@ -50,7 +57,9 @@ function FittedAnswerText({ text }: { text: string }) {
       while (low <= high) {
         const mid = Math.floor((low + high) / 2);
         textEl.style.fontSize = `${mid}px`;
-        if (textEl.scrollWidth <= availWidth + 1 && textEl.scrollHeight <= availHeight + 1) {
+        const w = textEl.scrollWidth;
+        const h = textEl.scrollHeight;
+        if (w > 0 && h > 0 && w <= availWidth && h <= availHeight) {
           best = mid;
           low = mid + 1;
         } else {
@@ -62,6 +71,7 @@ function FittedAnswerText({ text }: { text: string }) {
     };
 
     fit();
+    const rafId = typeof requestAnimationFrame !== "undefined" ? requestAnimationFrame(() => fit()) : 0;
 
     const observer =
       typeof ResizeObserver !== "undefined" ? new ResizeObserver(() => fit()) : null;
@@ -70,6 +80,7 @@ function FittedAnswerText({ text }: { text: string }) {
 
     return () => {
       cancelled = true;
+      if (rafId && typeof cancelAnimationFrame !== "undefined") cancelAnimationFrame(rafId);
       observer?.disconnect();
     };
   }, [text]);
@@ -243,7 +254,15 @@ function SpicyFlames() {
   );
 }
 
-function QuestionCard({ round, revealed }: { round: ActiveRound; revealed: boolean }) {
+function QuestionCard({
+  round,
+  revealed,
+  countdownLabel,
+}: {
+  round: ActiveRound;
+  revealed: boolean;
+  countdownLabel?: string | null;
+}) {
   const [lang] = useLanguage();
   const t = getStrings(lang);
   return (
@@ -251,7 +270,16 @@ function QuestionCard({ round, revealed }: { round: ActiveRound; revealed: boole
       <p className="eyebrow">{t.round.theRealQuestion}</p>
       <div className={`round-question-flip${revealed ? " is-revealed" : ""}`}>
         <div className="round-question-face round-question-back" aria-hidden={revealed}>
-          {!revealed && <span className="round-question-mark">?</span>}
+          {!revealed && (
+            <div className="round-question-back-inner">
+              <span className="round-question-mark">?</span>
+              {countdownLabel && (
+                <p className="round-question-countdown" role="status" aria-live="polite">
+                  {countdownLabel}
+                </p>
+              )}
+            </div>
+          )}
         </div>
         <div className="round-question-face round-question-front" aria-hidden={!revealed}>
           <h2 className="round-question-text">{round.normalQuestion}</h2>
@@ -284,7 +312,6 @@ export function Round({
     roundId: round?.id ?? null,
     value: round?.myAnswer ?? "",
   }));
-  const [selectedVote, setSelectedVote] = useState<string | null>(null);
   const [countdownNow, setCountdownNow] = useState(() => Date.now());
   const [questionDrawnRoundId, setQuestionDrawnRoundId] = useState<string | null>(null);
   const [resultsSettledRoundId, setResultsSettledRoundId] = useState<string | null>(null);
@@ -296,15 +323,15 @@ export function Round({
   const answerDraft =
     answerState.roundId === (round?.id ?? null) ? answerState.value : round?.myAnswer ?? "";
 
-  useEffect(() => {
-    setSelectedVote(null);
-  }, [round?.id, snapshot.phase]);
+  const meIsReady = snapshot.players.find((player) => player.id === snapshot.selfId)?.isReady ?? false;
+  const autoSubmittedRoundRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!round || snapshot.phase !== "results") {
       setResultsSettledRoundId(null);
       return;
     }
+    playResultsRevealSound();
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       setResultsSettledRoundId(round.id);
       return;
@@ -320,7 +347,8 @@ export function Round({
       snapshot.phase === "answers" && snapshot.settings.questionRevealMode === "auto"
         ? round?.questionRevealAt
         : null;
-    const activeDeadline = answerDeadline ?? revealAt;
+    const voteDeadline = snapshot.phase === "voting" ? round?.voteDeadlineAt : null;
+    const activeDeadline = answerDeadline ?? revealAt ?? voteDeadline;
     if (activeDeadline === null || activeDeadline === undefined) {
       return;
     }
@@ -328,7 +356,7 @@ export function Round({
     updateCountdown();
     const timer = window.setInterval(updateCountdown, 1_000);
     return () => window.clearInterval(timer);
-  }, [round?.id, round?.answerDeadlineAt, round?.questionRevealAt, snapshot.phase, snapshot.settings.questionRevealMode]);
+  }, [round?.id, round?.answerDeadlineAt, round?.questionRevealAt, round?.voteDeadlineAt, snapshot.phase, snapshot.settings.questionRevealMode]);
 
   useEffect(() => {
     if (!round || snapshot.phase !== "answering") {
@@ -340,7 +368,11 @@ export function Round({
       return;
     }
     setQuestionDrawnRoundId(null);
-    const timer = window.setTimeout(() => setQuestionDrawnRoundId(round.id), QUESTION_DRAW_DURATION_MS);
+    playCardSpinSound();
+    const timer = window.setTimeout(() => {
+      setQuestionDrawnRoundId(round.id);
+      playCardFlipSound();
+    }, QUESTION_DRAW_DURATION_MS);
     return () => window.clearTimeout(timer);
   }, [round?.id, snapshot.phase]);
 
@@ -444,11 +476,12 @@ export function Round({
   const playerById = new Map(snapshot.players.map((player) => [player.id, player]));
   const me = playerById.get(snapshot.selfId);
   const answeredCount = roster.filter(
-    (participant) => playerById.get(participant.id)?.hasAnswered,
+    (participant) => playerById.get(participant.id)?.isReady,
   ).length;
   const readyCount = roster.filter(
     (participant) => playerById.get(participant.id)?.isReady,
   ).length;
+  const totalVoters = Math.max(1, roster.length - 1);
   const votedCount =
     snapshot.phase === "results"
       ? Object.keys(round.votes ?? {}).length
@@ -462,6 +495,47 @@ export function Round({
     round.questionRevealAt === null
       ? null
       : Math.max(0, Math.ceil((round.questionRevealAt - countdownNow) / 1_000));
+  const voteSeconds =
+    round.voteDeadlineAt === null || round.voteDeadlineAt === undefined
+      ? null
+      : Math.max(0, Math.ceil((round.voteDeadlineAt - countdownNow) / 1_000));
+  const lastTickSecondRef = useRef<number | null>(null);
+  const answerTimeUrgent =
+    snapshot.phase === "answering" &&
+    answerSeconds !== null &&
+    answerSeconds >= 0 &&
+    answerSeconds <= 10;
+
+  useEffect(() => {
+    if (!answerTimeUrgent || meIsReady || answerSeconds === null) {
+      lastTickSecondRef.current = null;
+      return;
+    }
+    if (lastTickSecondRef.current === answerSeconds) return;
+    lastTickSecondRef.current = answerSeconds;
+    playCountdownTick(answerSeconds <= 3);
+  }, [answerSeconds, answerTimeUrgent, meIsReady]);
+
+  useEffect(() => {
+    if (
+      !round ||
+      snapshot.phase !== "answering" ||
+      meIsReady ||
+      !connected ||
+      answerSeconds === null ||
+      answerSeconds > 0 ||
+      autoSubmittedRoundRef.current === round.id
+    ) {
+      return;
+    }
+    const trimmed = answerDraft.trim();
+    if (!trimmed || trimmed.length > 80 || /[\u000A-\u000D\u0085\u2028\u2029]/.test(trimmed)) {
+      return;
+    }
+    autoSubmittedRoundRef.current = round.id;
+    void sendAction(snapshot.code, { type: "save_draft", answer: trimmed }, "answering", round.id).catch(() => {});
+  }, [answerDraft, answerSeconds, connected, meIsReady, round?.id, snapshot.code, snapshot.phase]);
+
   const progressLabel =
     snapshot.phase === "answering"
       ? answerSeconds !== null
@@ -475,12 +549,34 @@ export function Round({
           : t.round.readyProgress(readyCount, roster.length)
         : snapshot.phase === "question"
           ? t.round.readyProgress(readyCount, roster.length)
-          : t.round.votedProgress(votedCount, roster.length);
+          : voteSeconds !== null
+            ? t.round.votesLockIn(voteSeconds)
+            : t.round.votedProgress(votedCount, totalVoters);
   const readinessLabel = snapshot.phase === "answers" ? t.round.revealQuestion : t.round.readyToVote;
+
+  const lastRevealSoundRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!round) return;
+    if (snapshot.phase === "answers" && answerReveal.roundId === round.id && answerReveal.count > 0) {
+      const key = `${round.id}:flip:${answerReveal.count}`;
+      if (lastRevealSoundRef.current !== key) {
+        lastRevealSoundRef.current = key;
+        playCardFlipSound();
+      }
+      return;
+    }
+    if (snapshot.phase === "voting") {
+      const key = `${round.id}:question-flip`;
+      if (lastRevealSoundRef.current !== key) {
+        lastRevealSoundRef.current = key;
+        playCardFlipSound();
+      }
+    }
+  }, [answerReveal.count, answerReveal.roundId, round, snapshot.phase]);
 
   const submitAnswer = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!answerDraft.trim() || !connected || busy || isReady) {
+    if (!answerDraft.trim() || !connected || busy || isReady || answerSeconds === 0) {
       return;
     }
     const action: PartyAction = { type: "submit_answer", answer: answerDraft };
@@ -498,11 +594,6 @@ export function Round({
   const toggleReady = () => {
     if (!connected || busy) return;
     void act({ type: "set_ready", ready: !isReady });
-  };
-
-  const confirmVote = () => {
-    if (!selectedVote || !connected || busy || round.myVote !== null) return;
-    void act({ type: "vote", targetPlayerId: selectedVote });
   };
 
   const leaveButton = (
@@ -568,7 +659,7 @@ export function Round({
           </p>
           <h2>{phaseName}</h2>
         </div>
-        <span className="count-badge" aria-live="polite">
+        <span className={`count-badge${answerTimeUrgent || voteSeconds !== null ? " is-urgent" : ""}`} aria-live="polite">
           {progressLabel}
         </span>
       </section>
@@ -639,7 +730,7 @@ export function Round({
               <h2>{round.privateQuestion}</h2>
             </div>
           </div>
-          <form className="answer-form" onSubmit={submitAnswer}>
+          <form className={`answer-form${answerTimeUrgent && !isReady ? " is-urgent" : ""}`} onSubmit={submitAnswer}>
             <label className="field-label" htmlFor="round-answer">
               {t.round.yourAnswer}
             </label>
@@ -649,7 +740,7 @@ export function Round({
               value={answerDraft}
               maxLength={80}
               autoComplete="off"
-              disabled={!connected || busy || isReady}
+              disabled={!connected || busy || isReady || answerSeconds === 0}
               onChange={(event) => setAnswerState({ roundId: round.id, value: event.target.value })}
               placeholder={t.round.answerPlaceholder}
               aria-describedby="answer-help"
@@ -664,6 +755,7 @@ export function Round({
                 !connected ||
                 busy ||
                 isReady ||
+                answerSeconds === 0 ||
                 !answerDraft.trim()
               }
             >
@@ -730,7 +822,19 @@ export function Round({
                 </div>
               </section>
             ) : (
-              <QuestionCard round={round} revealed={snapshot.phase !== "answers"} />
+              <QuestionCard
+                round={round}
+                revealed={snapshot.phase !== "answers"}
+                countdownLabel={
+                  snapshot.phase === "answers" && snapshot.settings.questionRevealMode === "auto"
+                    ? revealSeconds === null
+                      ? t.round.autoFlipNote
+                      : revealSeconds === 0
+                        ? t.round.flippingNow
+                        : t.round.realQuestionDropsIn(revealSeconds)
+                    : null
+                }
+              />
             )}
 
             {snapshot.phase === "results" && (() => {
@@ -779,72 +883,6 @@ export function Round({
               );
             })()}
 
-            {snapshot.phase === "answers" &&
-              (snapshot.settings.questionRevealMode === "auto" ? (
-                <div className="card round-auto-countdown" role="status" aria-live="polite">
-                  <strong>
-                    {revealSeconds === null
-                      ? t.round.autoFlipNote
-                      : revealSeconds === 0
-                        ? t.round.flippingNow
-                        : t.round.realQuestionDropsIn(revealSeconds)}
-                  </strong>
-                  <span>{t.round.noButtonNeeded}</span>
-                </div>
-              ) : (
-                <div className="card ready-control round-gate-control">
-                  <p>
-                    {answerReveal.count < roster.length
-                      ? t.round.cardsFlipping
-                      : isReady
-                        ? t.round.readyForRealQuestion
-                        : t.round.flipTogetherPrompt}
-                  </p>
-                  <button
-                    className={isReady ? "secondary" : "primary"}
-                    type="button"
-                    disabled={!connected || busy || answerReveal.count < roster.length}
-                    onClick={toggleReady}
-                  >
-                    {isReady ? t.round.notReady : readinessLabel}
-                  </button>
-                </div>
-              ))}
-
-            {snapshot.phase === "voting" && (
-              <div className="card round-vote-bar">
-                {round.myVote !== null ? (
-                  <div className="round-locked-vote" role="status">
-                    <strong>{t.round.voteLockedIn}</strong>
-                    <span>
-                      {t.round.taggedAsSus(
-                        roster.find((participant) => participant.id === round.myVote)?.name ??
-                          t.round.yourSelectedPlayer,
-                      )}
-                    </span>
-                  </div>
-                ) : (
-                  <>
-                    <p className="round-vote-bar-status">
-                      {selectedVote
-                        ? t.round.selectedAsSus(
-                            roster.find((participant) => participant.id === selectedVote)?.name ??
-                              t.round.playerGeneric,
-                          )
-                        : t.round.tapAnswerToPick}
-                    </p>
-                    <button
-                      className="primary round-confirm-vote"
-                      type="button"
-                      disabled={!connected || busy || !selectedVote}
-                      onClick={confirmVote}
-                    >
-                      {t.round.lockInVote}
-                    </button>
-                  </>
-                )}
-              </div>
-            )}
           </div>
 
           <section className="card round-answer-section">
@@ -854,23 +892,9 @@ export function Round({
                 <h2>{boardTitle}</h2>
               </div>
             </div>
-            {snapshot.phase === "answers" && (
-              <div className="answer-reveal-timer" role="status" aria-live="polite">
-                <span>
-                  {answerReveal.count >= roster.length
-                    ? t.round.allCardsFlipped
-                    : t.round.flippingCardOf(answerReveal.count + 1, roster.length)}
-                </span>
-                <span>
-                  {answerReveal.count >= roster.length
-                    ? t.round.readyForRealQ
-                    : t.round.oneCardPerSec}
-                </span>
-              </div>
-            )}
             {snapshot.phase === "voting" && (
               <p className="muted small-copy">
-                {t.round.votingInstruction}
+                {round.canVote ? t.round.votingInstruction : t.round.impostorCantVote}
               </p>
             )}
             <AnswerList
@@ -889,9 +913,16 @@ export function Round({
                   : 0
               }
               statusForPlayer={answerProgress}
-              selectedVote={snapshot.phase === "voting" ? selectedVote : undefined}
-              voteDisabled={!connected || busy || round.myVote !== null}
-              onVoteSelect={snapshot.phase === "voting" ? setSelectedVote : undefined}
+              selectedVote={snapshot.phase === "voting" ? round.myVote : undefined}
+              voteDisabled={!connected || busy || !round.canVote || voteSeconds === 0}
+              onVoteSelect={
+                snapshot.phase === "voting" && round.canVote && voteSeconds !== 0
+                  ? (targetPlayerId) => {
+                      playVoteSound();
+                      void act({ type: "vote", targetPlayerId });
+                    }
+                  : undefined
+              }
               impostorId={snapshot.phase === "results" ? round.impostorId : undefined}
               votersByTarget={votersByTarget}
             />
@@ -900,6 +931,28 @@ export function Round({
       )}
 
       <div className="round-actions">
+        {snapshot.phase === "answering" && (
+          <button
+            className={round.myRerollVote ? "primary" : "secondary"}
+            type="button"
+            disabled={!connected || busy}
+            onClick={() => void act({ type: "vote_reroll" })}
+          >
+            {round.myRerollVote
+              ? t.round.rerollVoted(round.rerollVotes, round.rerollThreshold)
+              : t.round.rerollVote(round.rerollVotes, round.rerollThreshold)}
+          </button>
+        )}
+        {snapshot.phase === "answers" && snapshot.settings.questionRevealMode === "ready" && (
+          <button
+            className={isReady ? "secondary" : "primary"}
+            type="button"
+            disabled={!connected || busy || answerReveal.count < roster.length}
+            onClick={toggleReady}
+          >
+            {isReady ? t.round.notReady : readinessLabel}
+          </button>
+        )}
         {snapshot.selfId === snapshot.hostId && snapshot.phase !== "results" && (
           <button
             className="secondary"

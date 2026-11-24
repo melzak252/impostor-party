@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { SupportedLanguage } from "./i18n";
+import { getAudioVolume } from "./sfx";
 
 const TTS_STORAGE_KEY = "impostor_tts_enabled";
 const TTS_EVENT = "impostor-tts-change";
@@ -129,6 +130,7 @@ function speakWithWebSpeech(text: string, lang: SupportedLanguage, interrupt = f
     utterance.lang = voice?.lang ?? LANG_LOCALES[lang][0];
     if (voice) utterance.voice = voice;
     utterance.rate = 1.15;
+    utterance.volume = getAudioVolume();
     utterance.pitch = 1;
     utterance.volume = 1;
     window.speechSynthesis.speak(utterance);
@@ -149,6 +151,7 @@ function playNextQueuedAudio(generation: number): void {
   const url = `/api/tts?lang=${encodeURIComponent(next.lang)}&text=${encodeURIComponent(next.text)}`;
   const audio = new Audio(url);
   audio.playbackRate = 1.18;
+  audio.volume = getAudioVolume();
   currentAudio = audio;
 
   const finish = () => {

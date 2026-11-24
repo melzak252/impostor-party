@@ -1107,7 +1107,6 @@ export const PARTY_QUESTION_ITEMS: readonly QuestionPoolItem[] = [
   {
     "id": "party-spicy-place-05",
     "pool": "spicy_scenarios",
-    "spicy": true,
     "angle": "neg",
     "text": "Worst place to run into an ex?"
   },
@@ -1121,7 +1120,6 @@ export const PARTY_QUESTION_ITEMS: readonly QuestionPoolItem[] = [
   {
     "id": "party-spicy-place-09",
     "pool": "spicy_scenarios",
-    "spicy": true,
     "angle": "neg",
     "text": "Worst possible place for a first date?"
   },
@@ -1149,7 +1147,6 @@ export const PARTY_QUESTION_ITEMS: readonly QuestionPoolItem[] = [
   {
     "id": "party-spicy-person-02",
     "pool": "spicy_person",
-    "spicy": true,
     "angle": "neg",
     "text": "Who here is most likely to text their ex tonight?"
   },
@@ -1170,7 +1167,6 @@ export const PARTY_QUESTION_ITEMS: readonly QuestionPoolItem[] = [
   {
     "id": "party-spicy-person-05",
     "pool": "spicy_person",
-    "spicy": true,
     "angle": "weird",
     "text": "Who here falls in love way too fast?"
   },
@@ -1184,7 +1180,6 @@ export const PARTY_QUESTION_ITEMS: readonly QuestionPoolItem[] = [
   {
     "id": "party-spicy-person-07",
     "pool": "spicy_person",
-    "spicy": true,
     "angle": "pos",
     "text": "Who here flirts without even realizing it?"
   },
@@ -1257,7 +1252,6 @@ export const PARTY_QUESTION_ITEMS: readonly QuestionPoolItem[] = [
   {
     "id": "party-spicy-person-20",
     "pool": "spicy_person",
-    "spicy": true,
     "angle": "neg",
     "text": "Who here holds a breakup grudge the longest?"
   },
@@ -1289,13 +1283,6 @@ export const PARTY_QUESTION_ITEMS: readonly QuestionPoolItem[] = [
     "angle": "neg",
     "text": "Who here could be a serial killer in disguise?",
     "conflictGroup": "murder_killer"
-  },
-  {
-    "id": "party-spicy-person-28",
-    "pool": "spicy_person",
-    "spicy": true,
-    "angle": "pos",
-    "text": "Who here is the best hype person before a date?"
   },
   {
     "id": "party-spicy-person-29",
@@ -1506,7 +1493,6 @@ export const PARTY_QUESTION_ITEMS: readonly QuestionPoolItem[] = [
   {
     "id": "party-spicy-num-27",
     "pool": "spicy_numbers",
-    "spicy": true,
     "angle": "neg",
     "shape": "count_0_10",
     "text": "How many people in this city do you pray you never run into?"

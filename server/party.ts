@@ -277,7 +277,7 @@ export class PartyService {
             phase: "lobby",
             settings: {
               visibility,
-              questionRevealMode: "ready",
+              questionRevealMode: "auto",
               questionSource: "builtin",
               spicyMode: false,
               answerTimeSeconds: 60,
@@ -494,7 +494,8 @@ export class PartyService {
       state.version += 1;
       state.updatedAt = now;
       this.store.saveParty(state);
-      return { kind: "changed" as const, partyId: state.id, snapshot: projectParty(state, actor.id, this.connectedIds(state.id)) };
+      const kind = action.type === "save_draft" ? ("unchanged" as const) : ("changed" as const);
+      return { kind, partyId: state.id, snapshot: projectParty(state, actor.id, this.connectedIds(state.id)) };
     });
 
     if (outcome.kind === "removed") {

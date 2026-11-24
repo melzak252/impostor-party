@@ -12,6 +12,7 @@ import {
 } from "./i18n";
 import { PlayerFace } from "./PlayerFace";
 import { Round } from "./Round";
+import { useAudioVolume } from "./sfx";
 import { isTtsSupported, useTtsEnabled } from "./tts";
 import { useParty, type UsePartyResult } from "./useParty";
 
@@ -50,26 +51,100 @@ function LanguageSelect() {
   );
 }
 
-function VoiceToggle() {
-  const [lang] = useLanguage();
-  const t = getStrings(lang);
-  const [enabled, toggle] = useTtsEnabled();
-  if (!isTtsSupported()) return null;
+function SpeakerSvg({ muted }: { muted: boolean }) {
   return (
-    <button
-      type="button"
-      className={enabled ? "secondary" : "ghost"}
-      aria-pressed={enabled}
-      onClick={toggle}
-      style={{
-        minHeight: "34px",
-        padding: "4px 10px",
-        fontSize: "0.8125rem",
-        whiteSpace: "nowrap",
-      }}
-    >
-      {enabled ? `🔊 ${t.common.voiceOn}` : `🔇 ${t.common.voiceOff}`}
-    </button>
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" className="volume-svg">
+      <path
+        d="M4 9.5 H8.5 L14 4.5 V19.5 L8.5 14.5 H4 Z"
+        fill="currentColor"
+        stroke="#1A103D"
+        strokeWidth="2.2"
+        strokeLinejoin="round"
+      />
+      {muted ? (
+        <path
+          d="M17.5 9 L21.5 15 M21.5 9 L17.5 15"
+          fill="none"
+          stroke="#FF5A5F"
+          strokeWidth="2.6"
+          strokeLinecap="round"
+        />
+      ) : (
+        <>
+          <path
+            d="M17 8.5 Q19.5 12 17 15.5"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.4"
+            strokeLinecap="round"
+          />
+          <path
+            d="M19.5 6 Q23 12 19.5 18"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.4"
+            strokeLinecap="round"
+          />
+        </>
+      )}
+    </svg>
+  );
+}
+
+function VoiceToggle() {
+  const [volume, setVolume] = useAudioVolume();
+  const lastVolumeRef = useRef(volume > 0 ? volume : 0.7);
+  if (volume > 0) lastVolumeRef.current = volume;
+  const muted = volume <= 0;
+
+  const toggleMute = () => {
+    if (muted) {
+      setVolume(lastVolumeRef.current > 0 ? lastVolumeRef.current : 0.7);
+    } else {
+      setVolume(0);
+    }
+  };
+
+  return (
+    <div className="volume-popover-wrap">
+      <div className="volume-popover" role="group" aria-label="Volume">
+        <button
+          type="button"
+          className="volume-edge-btn"
+          aria-label="Mute"
+          onClick={() => setVolume(0)}
+        >
+          <SpeakerSvg muted={true} />
+        </button>
+        <input
+          className="voice-volume-slider"
+          type="range"
+          min={0}
+          max={100}
+          step={1}
+          value={Math.round(volume * 100)}
+          aria-label="Volume"
+          onChange={(event) => setVolume(Number(event.target.value) / 100)}
+        />
+        <button
+          type="button"
+          className="volume-edge-btn"
+          aria-label="Max volume"
+          onClick={() => setVolume(1)}
+        >
+          <SpeakerSvg muted={false} />
+        </button>
+      </div>
+      <button
+        type="button"
+        className={`volume-icon-btn${muted ? " is-muted" : ""}`}
+        aria-label={muted ? "Unmute audio" : "Mute audio"}
+        aria-pressed={muted}
+        onClick={toggleMute}
+      >
+        <SpeakerSvg muted={muted} />
+      </button>
+    </div>
   );
 }
 
@@ -706,10 +781,17 @@ function LobbyView({
     void act({ type: "set_color", colorId });
   };
 
+  const [pendingKick, setPendingKick] = useState<PlayerSnapshot | null>(null);
+
   const kickPlayer = (player: PlayerSnapshot) => {
-    if (!window.confirm(t.lobby.kickConfirm(player.name))) return;
+    setPendingKick(player);
+  };
+
+  const confirmKick = () => {
+    if (!pendingKick) return;
     clearError();
-    void act({ type: "kick", playerId: player.id });
+    void act({ type: "kick", playerId: pendingKick.id });
+    setPendingKick(null);
   };
 
   const leave = async () => {
@@ -912,6 +994,38 @@ function LobbyView({
               </button>
             </div>
           </aside>
+        </div>
+      )}
+
+      {pendingKick && (
+        <div
+          className="topics-modal-backdrop"
+          role="dialog"
+          aria-modal="true"
+          aria-label={t.lobby.bootPlayer}
+          onClick={(event) => {
+            if (event.target === event.currentTarget) setPendingKick(null);
+          }}
+        >
+          <div className="card confirm-modal">
+            <div className="confirm-modal-header">
+              <PlayerFace colorId={pendingKick.colorId} size="md" />
+              <p className="confirm-modal-message">{t.lobby.kickConfirm(pendingKick.name)}</p>
+            </div>
+            <div className="button-row">
+              <button type="button" className="secondary" onClick={() => setPendingKick(null)}>
+                {t.common.dismiss}
+              </button>
+              <button
+                type="button"
+                className="danger-button"
+                disabled={!connected || busy}
+                onClick={confirmKick}
+              >
+                {t.lobby.bootPlayer}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

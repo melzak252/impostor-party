@@ -58,6 +58,15 @@ function randomIndex(context: PartyActionContext, maxExclusive: number): number 
   return selection;
 }
 
+function pairPoolKey(pairId: string): string | null {
+  const parts = pairId.split(":");
+  if (parts[0] === "mix" || parts[0] === "wild" || parts[0] === "loc" || parts[0] === "locwild" || parts[0] === "sug") {
+    return parts[1] ?? null;
+  }
+  if (parts[0] === "native") return parts[2] ?? null;
+  return null;
+}
+
 function startRound(state: PartyState, context: PartyActionContext, mode: "start" | "next" | "skip" = "start"): void {
   if (state.players.length < 3 || state.players.length > 6 || state.players.some((player) => !context.connectedIds.has(player.id))) {
     throw new PartyError("NOT_READY", 409, "At least three players must be connected before the host can start a round.");
@@ -76,7 +85,21 @@ function startRound(state: PartyState, context: PartyActionContext, mode: "start
   const unusedPairsInPool = normalPool.filter((pair) => !usedQuestionIds.has(pair.id));
   const isResettingBag = isResettingNormals || unusedPairsInPool.length === 0;
   const selectionPool = unusedPairsInPool.length > 0 ? unusedPairsInPool : normalPool;
-  const selectedPair = selectionPool[randomIndex(context, selectionPool.length)]!;
+  const lastPairId = state.usedQuestionIds.at(-1);
+  const lastPool = lastPairId ? pairPoolKey(lastPairId) : null;
+  const diversePool = lastPool
+    ? selectionPool.filter((pair) => pairPoolKey(pair.id) !== lastPool)
+    : [];
+  const candidatePool = diversePool.length > 0 ? diversePool : selectionPool;
+  const groupsByNormal = new Map<string, QuestionPair[]>();
+  for (const pair of candidatePool) {
+    const existing = groupsByNormal.get(pair.normalQuestion);
+    if (existing) existing.push(pair);
+    else groupsByNormal.set(pair.normalQuestion, [pair]);
+  }
+  const normalGroups = Array.from(groupsByNormal.values());
+  const chosenGroup = normalGroups[randomIndex(context, normalGroups.length)]!;
+  const selectedPair = chosenGroup[(state.lastRoundNumber + (context.now >>> 0)) % chosenGroup.length]!;
   const impostor = state.players[randomIndex(context, state.players.length)]!;
   const nextUsedQuestionIds = isResettingBag ? [] : [...state.usedQuestionIds];
   nextUsedQuestionIds.push(selectedPair.id);
@@ -129,9 +152,11 @@ function startRound(state: PartyState, context: PartyActionContext, mode: "start
     impostorId: impostor.id,
     answers: {},
     readyPlayerIds: [],
+    rerollVoterIds: [],
     votes: {},
     answerDeadlineAt,
     questionRevealAt: null,
+    voteDeadlineAt: null,
   };
   state.phase = "answering";
   state.notice = null;
@@ -153,7 +178,7 @@ function currentRound(state: PartyState, actorId: string): RoundState {
 }
 
 const ANSWER_REVEAL_STEP_MS = 2_000;
-const AUTO_QUESTION_REVEAL_DELAY_MS = 8_000;
+const AUTO_QUESTION_REVEAL_DELAY_MS = 2_000;
 
 function autoQuestionRevealAt(state: PartyState, round: RoundState, now: number): number | null {
   if (state.settings.questionRevealMode !== "auto") return null;
@@ -213,27 +238,66 @@ function setReady(state: PartyState, actorId: string, ready: boolean, context: P
   }
 }
 
+function validateAnswerText(value: string): string {
+  const answer = value.trim();
+  const length = Array.from(answer).length;
+  if (length < 1 || length > 80 || /[\u000A-\u000D\u0085\u2028\u2029]/.test(answer)) {
+    throw validationError("Answer must be a single line containing 1 to 80 characters.");
+  }
+  return answer;
+}
+
+function saveDraft(state: PartyState, actorId: string, value: string): void {
+  if (state.phase !== "answering") return;
+  const round = currentRound(state, actorId);
+  if (round.readyPlayerIds.includes(actorId)) return;
+  const trimmed = value.trim();
+  if (!trimmed) {
+    delete round.answers[actorId];
+    return;
+  }
+  round.answers[actorId] = validateAnswerText(trimmed);
+}
+
 function submitAnswer(state: PartyState, actorId: string, value: string, context: PartyActionContext): void {
   if (state.phase !== "answering") throw forbidden("Answers can only be submitted during the answer stage.");
   const round = currentRound(state, actorId);
   if (round.readyPlayerIds.includes(actorId)) {
     throw new PartyError("NOT_READY", 409, "Your answer has already been submitted.");
   }
-  const answer = value.trim();
-  const length = Array.from(answer).length;
-  if (length < 1 || length > 80 || /[\u000A-\u000D\u0085\u2028\u2029]/.test(answer)) {
-    throw validationError("Answer must be a single line containing 1 to 80 characters.");
-  }
+  const answer = validateAnswerText(value);
   round.answers[actorId] = answer;
   round.readyPlayerIds.push(actorId);
   transitionAfterReady(state, round, context);
 }
 
-function submitVote(state: PartyState, actorId: string, targetPlayerId: string): void {
+function finalizeVotes(state: PartyState, round: RoundState): void {
+  const roundPoints: Record<string, number> = {};
+  for (const participant of round.participants) roundPoints[participant.id] = 0;
+  for (const participant of round.participants) {
+    if (participant.id === round.impostorId) continue;
+    if (round.votes[participant.id] === round.impostorId) {
+      roundPoints[participant.id] = (roundPoints[participant.id] ?? 0) + 1;
+    } else {
+      roundPoints[round.impostorId] = (roundPoints[round.impostorId] ?? 0) + 1;
+    }
+  }
+  for (const player of state.players) {
+    const gained = roundPoints[player.id] ?? 0;
+    if (gained > 0) player.score = (player.score ?? 0) + gained;
+  }
+  round.roundPoints = roundPoints;
+  state.phase = "results";
+  round.readyPlayerIds = [];
+  round.questionRevealAt = null;
+  round.voteDeadlineAt = null;
+}
+
+function submitVote(state: PartyState, actorId: string, targetPlayerId: string, context: PartyActionContext): void {
   if (state.phase !== "voting") throw forbidden("Votes can only be cast during the voting stage.");
   const round = currentRound(state, actorId);
-  if (Object.hasOwn(round.votes, actorId)) {
-    throw new PartyError("INVALID_VOTE", 409, "You have already voted this round.");
+  if (actorId === round.impostorId) {
+    throw forbidden("The impostor does not vote this round.");
   }
   const targetIsCurrentParticipant = round.participants.some((participant) =>
     participant.id === targetPlayerId && state.players.some((player) => player.id === targetPlayerId),
@@ -242,25 +306,11 @@ function submitVote(state: PartyState, actorId: string, targetPlayerId: string):
     throw new PartyError("INVALID_VOTE", 409, "Choose another player who is still in this round.");
   }
   round.votes[actorId] = targetPlayerId;
-  if (round.participants.every((participant) => Object.hasOwn(round.votes, participant.id))) {
-    const roundPoints: Record<string, number> = {};
-    for (const participant of round.participants) roundPoints[participant.id] = 0;
-    for (const participant of round.participants) {
-      if (participant.id === round.impostorId) continue;
-      if (round.votes[participant.id] === round.impostorId) {
-        roundPoints[participant.id] = (roundPoints[participant.id] ?? 0) + 1;
-      } else {
-        roundPoints[round.impostorId] = (roundPoints[round.impostorId] ?? 0) + 1;
-      }
-    }
-    for (const player of state.players) {
-      const gained = roundPoints[player.id] ?? 0;
-      if (gained > 0) player.score = (player.score ?? 0) + gained;
-    }
-    round.roundPoints = roundPoints;
-    state.phase = "results";
-    round.readyPlayerIds = [];
-    round.questionRevealAt = null;
+  const allCrewVoted = round.participants
+    .filter((participant) => participant.id !== round.impostorId)
+    .every((participant) => Object.hasOwn(round.votes, participant.id));
+  if (allCrewVoted && (round.voteDeadlineAt === null || round.voteDeadlineAt === undefined)) {
+    round.voteDeadlineAt = context.now + 5_000;
   }
 }
 
@@ -325,11 +375,29 @@ export function applyGameAction(
     case "submit_answer":
       submitAnswer(state, actorId, action.answer, context);
       return;
+    case "save_draft":
+      saveDraft(state, actorId, action.answer);
+      return;
     case "set_ready":
       setReady(state, actorId, action.ready, context);
       return;
+    case "vote_reroll": {
+      if (state.phase !== "answering") throw forbidden("Reroll votes can only be cast during the answer stage.");
+      const round = currentRound(state, actorId);
+      const voters = round.rerollVoterIds ?? [];
+      if (voters.includes(actorId)) {
+        round.rerollVoterIds = voters.filter((id) => id !== actorId);
+      } else {
+        round.rerollVoterIds = [...voters, actorId];
+      }
+      const threshold = Math.max(1, round.participants.length - 1);
+      if (round.rerollVoterIds.length >= threshold) {
+        startRound(state, context, "skip");
+      }
+      return;
+    }
     case "vote":
-      submitVote(state, actorId, action.targetPlayerId);
+      submitVote(state, actorId, action.targetPlayerId, context);
       return;
     case "return_to_lobby":
       if (state.phase !== "results") throw forbidden("Only the host can return a completed round to the lobby.");
@@ -347,7 +415,7 @@ export function advanceGameDeadline(state: PartyState, context: PartyActionConte
   if (!state.round) return false;
   if (state.phase === "answering") {
     const deadlineAt = state.round.answerDeadlineAt ?? null;
-    if (deadlineAt === null || context.now < deadlineAt) return false;
+    if (deadlineAt === null || context.now < deadlineAt + 2_000) return false;
     for (const participant of state.round.participants) {
       if (!Object.hasOwn(state.round.answers, participant.id)) {
         state.round.answers[participant.id] = "—";
@@ -359,11 +427,19 @@ export function advanceGameDeadline(state: PartyState, context: PartyActionConte
     state.round.questionRevealAt = autoQuestionRevealAt(state, state.round, context.now);
     return true;
   }
-  if (state.phase !== "answers" || state.settings.questionRevealMode !== "auto") return false;
-  const revealAt = state.round.questionRevealAt;
-  if (revealAt === null || context.now < revealAt) return false;
-  state.round.readyPlayerIds = [];
-  state.round.questionRevealAt = null;
-  state.phase = "voting";
-  return true;
+  if (state.phase === "answers" && state.settings.questionRevealMode === "auto") {
+    const revealAt = state.round.questionRevealAt;
+    if (revealAt === null || context.now < revealAt) return false;
+    state.round.readyPlayerIds = [];
+    state.round.questionRevealAt = null;
+    state.phase = "voting";
+    return true;
+  }
+  if (state.phase === "voting") {
+    const voteDeadlineAt = state.round.voteDeadlineAt ?? null;
+    if (voteDeadlineAt === null || context.now < voteDeadlineAt) return false;
+    finalizeVotes(state, state.round);
+    return true;
+  }
+  return false;
 }

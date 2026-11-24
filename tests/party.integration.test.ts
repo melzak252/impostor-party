@@ -595,13 +595,19 @@ test("the automatic question reveal is exact, stale actions return a safe snapsh
     const voting = await jsonRequest(app, `/api/parties/${code}`, { cookie: host.cookie });
     expect(field(snapshot(voting), "phase")).toBe("voting");
     const playerIds = arrayField(snapshot(voting), "players").map((player) => stringField(player, "id"));
-    for (const [index, cookie] of cookies.entries()) {
+    const impostorVote = await postAction(cookies[0]!, "voting", roundId, {
+      type: "vote",
+      targetPlayerId: playerIds[1]!,
+    });
+    expect(impostorVote.response.status).toBe(403);
+    for (const [index, cookie] of cookies.slice(1).entries()) {
       const vote = await postAction(cookie, "voting", roundId, {
         type: "vote",
-        targetPlayerId: playerIds[(index + 1) % playerIds.length]!,
+        targetPlayerId: playerIds[(index + 2) % playerIds.length]!,
       });
       expect(vote.response.status).toBe(200);
     }
+    now += 5_000;
     const results = await jsonRequest(app, `/api/parties/${code}`, { cookie: host.cookie });
     expect(field(snapshot(results), "phase")).toBe("results");
     const leaveAfterResults = await postAction(guests[0]!.cookie, "voting", roundId, { type: "leave" });
@@ -614,7 +620,7 @@ test("the automatic question reveal is exact, stale actions return a safe snapsh
       "Host", "Guest 1", "Guest 2",
     ]);
     expect(Object.keys(record(field(retained, "answers")))).toHaveLength(3);
-    expect(Object.keys(record(field(retained, "votes")))).toHaveLength(3);
+    expect(Object.keys(record(field(retained, "votes")))).toHaveLength(2);
   } finally {
     for (const socket of sockets) await closePartySocket(socket);
     await app.close();

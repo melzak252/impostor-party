@@ -251,7 +251,7 @@ test("answer submissions mark players ready and preserve answer privacy until th
     const snapshot = projectParty(state, playerId, new Set(PLAYER_IDS));
     const round = snapshot.round!;
     expect(Object.keys(round).sort()).toEqual([
-      "answerDeadlineAt", "answers", "id", "isSpicy", "matchRound", "myAnswer", "myVote", "number", "participants", "privateQuestion", "questionRevealAt", "totalRounds",
+      "answerDeadlineAt", "answers", "canVote", "id", "isSpicy", "matchRound", "myAnswer", "myRerollVote", "myVote", "number", "participants", "privateQuestion", "questionRevealAt", "rerollThreshold", "rerollVotes", "totalRounds", "voteDeadlineAt",
     ]);
     expect(round.answers).toEqual({
       [PLAYER_IDS[0]]: "answer 1",
@@ -270,7 +270,7 @@ test("answer submissions mark players ready and preserve answer privacy until th
   for (const playerId of PLAYER_IDS) {
     const round = projectParty(state, playerId, new Set(PLAYER_IDS)).round!;
     expect(Object.keys(round).sort()).toEqual([
-      "answerDeadlineAt", "answers", "id", "isSpicy", "matchRound", "myAnswer", "myVote", "normalQuestion", "number", "participants", "privateQuestion", "questionRevealAt", "totalRounds",
+      "answerDeadlineAt", "answers", "canVote", "id", "isSpicy", "matchRound", "myAnswer", "myRerollVote", "myVote", "normalQuestion", "number", "participants", "privateQuestion", "questionRevealAt", "rerollThreshold", "rerollVotes", "totalRounds", "voteDeadlineAt",
     ]);
     expect(round.normalQuestion).toBe(BUILTIN_QUESTION_PAIRS[0]!.normalQuestion);
     expect(round.myVote).toBeNull();
@@ -279,26 +279,27 @@ test("answer submissions mark players ready and preserve answer privacy until th
     expect(projectParty(state, playerId, new Set(PLAYER_IDS)).players.every((player) => !player.hasVoted)).toBe(true);
   }
 
-  const targets = [PLAYER_IDS[1]!, PLAYER_IDS[2]!, PLAYER_IDS[0]!];
-  for (let index = 0; index < PLAYER_IDS.length - 1; index += 1) {
-    const playerId = PLAYER_IDS[index]!;
-    apply(state, playerId, { type: "vote", targetPlayerId: targets[index]! }, context);
-    const round = projectParty(state, playerId, new Set(PLAYER_IDS)).round!;
-    expect(round.myVote).toBe(targets[index]);
-    expect(round).not.toHaveProperty("votes");
-  }
-  const nonVoterRound = projectParty(state, PLAYER_IDS[2]!, new Set(PLAYER_IDS)).round!;
+  // PLAYER_IDS[2] is the impostor in this deterministic round.
+  expect(caughtPartyError(() => apply(state, PLAYER_IDS[2]!, { type: "vote", targetPlayerId: PLAYER_IDS[0]! }, context)).code).toBe("FORBIDDEN");
+
+  apply(state, PLAYER_IDS[0]!, { type: "vote", targetPlayerId: PLAYER_IDS[1]! }, context);
+  expect(projectParty(state, PLAYER_IDS[0]!, new Set(PLAYER_IDS)).round!.myVote).toBe(PLAYER_IDS[1]);
+  expect(projectParty(state, PLAYER_IDS[0]!, new Set(PLAYER_IDS)).round!).not.toHaveProperty("votes");
+  const nonVoterRound = projectParty(state, PLAYER_IDS[1]!, new Set(PLAYER_IDS)).round!;
   expect(nonVoterRound.myVote).toBeNull();
   expect(nonVoterRound).not.toHaveProperty("votes");
-  const finalVoteRequest = actionRequest(state, { type: "vote", targetPlayerId: targets[2]! });
-  applyGameAction(state, PLAYER_IDS[2]!, finalVoteRequest, context);
-  expect(caughtPartyError(() => applyGameAction(state, PLAYER_IDS[2]!, finalVoteRequest, context)).code).toBe("STALE_ACTION");
+
+  apply(state, PLAYER_IDS[1]!, { type: "vote", targetPlayerId: PLAYER_IDS[2]! }, context);
+  expect(state.phase).toBe("voting");
+  expect(state.round?.voteDeadlineAt).toBe(context.now + 5_000);
+  expect(advanceGameDeadline(state, { ...context, now: context.now + 4_999 })).toBe(false);
+  expect(advanceGameDeadline(state, { ...context, now: context.now + 5_000 })).toBe(true);
   expect(state.phase).toBe("results");
   for (const playerId of PLAYER_IDS) {
     const round = projectParty(state, playerId, new Set(PLAYER_IDS)).round!;
     expect(Object.keys(round).sort()).toEqual([
-      "answerDeadlineAt", "answers", "id", "impostorId", "impostorQuestion", "isSpicy", "matchRound", "myAnswer", "myVote", "normalQuestion",
-      "number", "participants", "privateQuestion", "questionRevealAt", "roundPoints", "totalRounds", "votes",
+      "answerDeadlineAt", "answers", "canVote", "id", "impostorId", "impostorQuestion", "isSpicy", "matchRound", "myAnswer", "myRerollVote", "myVote", "normalQuestion",
+      "number", "participants", "privateQuestion", "questionRevealAt", "rerollThreshold", "rerollVotes", "roundPoints", "totalRounds", "voteDeadlineAt", "votes",
     ]);
     expect(round.participants.map((participant) => participant.id)).toEqual([...PLAYER_IDS]);
     expect(round.impostorQuestion).toBe(BUILTIN_QUESTION_PAIRS[0]!.impostorQuestion);
@@ -306,7 +307,6 @@ test("answer submissions mark players ready and preserve answer privacy until th
     expect(round.votes).toEqual({
       [PLAYER_IDS[0]]: PLAYER_IDS[1],
       [PLAYER_IDS[1]]: PLAYER_IDS[2],
-      [PLAYER_IDS[2]]: PLAYER_IDS[0],
     });
   }
 
@@ -363,12 +363,12 @@ test("auto reveal observes the exact persisted deadline and still requires the v
   submitAnswers(state, context);
 
   expect(state.phase).toBe("answers");
-  expect(state.round?.questionRevealAt).toBe(context.now + 14_000);
+  expect(state.round?.questionRevealAt).toBe(context.now + 8_000);
   expect(caughtPartyError(() => apply(state, HOST_ID, { type: "set_ready", ready: true }, context)).code).toBe("FORBIDDEN");
-  expect(advanceGameDeadline(state, { ...context, now: context.now + 13_999 })).toBe(false);
+  expect(advanceGameDeadline(state, { ...context, now: context.now + 7_999 })).toBe(false);
   expect(state.phase).toBe("answers");
   expect(projectParty(state, HOST_ID, new Set(PLAYER_IDS)).round).not.toHaveProperty("normalQuestion");
-  expect(advanceGameDeadline(state, { ...context, now: context.now + 14_000 })).toBe(true);
+  expect(advanceGameDeadline(state, { ...context, now: context.now + 8_000 })).toBe(true);
   expect(state.phase).toBe("voting");
   expect(state.round?.readyPlayerIds).toEqual([]);
   expect(state.round?.questionRevealAt).toBeNull();
@@ -394,11 +394,13 @@ test("stale requests are rejected before phase authorization and duplicate votes
   expect(state.phase).toBe("answers");
   expect(caughtPartyError(() => applyGameAction(state, PLAYER_IDS[2]!, finalAnswerRequest, context)).code).toBe("STALE_ACTION");
   readyAll(state, context);
-  const firstTarget = PLAYER_IDS[1]!;
-  const replacementTarget = PLAYER_IDS[2]!;
-  apply(state, PLAYER_IDS[0], { type: "vote", targetPlayerId: firstTarget }, context);
-  expect(caughtPartyError(() => apply(state, PLAYER_IDS[0], { type: "vote", targetPlayerId: replacementTarget }, context)).code).toBe("INVALID_VOTE");
-  expect(state.round!.votes[PLAYER_IDS[0]]).toBe(firstTarget);
+  const firstTarget = PLAYER_IDS[2]!;
+  const replacementTarget = PLAYER_IDS[0]!;
+  expect(caughtPartyError(() => apply(state, PLAYER_IDS[0], { type: "vote", targetPlayerId: firstTarget }, context)).code).toBe("FORBIDDEN");
+  apply(state, PLAYER_IDS[1], { type: "vote", targetPlayerId: firstTarget }, context);
+  expect(state.round!.votes[PLAYER_IDS[1]]).toBe(firstTarget);
+  apply(state, PLAYER_IDS[1], { type: "vote", targetPlayerId: replacementTarget }, context);
+  expect(state.round!.votes[PLAYER_IDS[1]]).toBe(replacementTarget);
   expect(caughtPartyError(() => apply(state, PLAYER_IDS[1], { type: "vote", targetPlayerId: PLAYER_IDS[1]! }, context)).code).toBe("INVALID_VOTE");
   expect(caughtPartyError(() => apply(state, PLAYER_IDS[1], { type: "vote", targetPlayerId: "00000000-0000-4000-8000-000000000099" }, context)).code).toBe("INVALID_VOTE");
   expect(caughtPartyError(() => apply(state, PLAYER_IDS[0], { type: "set_ready", ready: true }, context)).code).toBe("FORBIDDEN");
@@ -444,10 +446,10 @@ test("answer timer deadline advances answering to answers and fills missing answ
   expect(state.round?.answerDeadlineAt).toBe(context.now + 30_000);
 
   apply(state, PLAYER_IDS[0], { type: "submit_answer", answer: "early answer" }, context);
-  expect(advanceGameDeadline(state, { ...context, now: context.now + 29_999 })).toBe(false);
+  expect(advanceGameDeadline(state, { ...context, now: context.now + 31_999 })).toBe(false);
   expect(state.phase).toBe("answering");
 
-  expect(advanceGameDeadline(state, { ...context, now: context.now + 30_000 })).toBe(true);
+  expect(advanceGameDeadline(state, { ...context, now: context.now + 32_000 })).toBe(true);
   expect(state.phase).toBe("answers");
   expect(state.round?.answerDeadlineAt).toBeNull();
   expect(state.round?.answers[PLAYER_IDS[0]]).toBe("early answer");
@@ -481,13 +483,13 @@ test("scoring awards +1 to crewmates who catch the impostor and +1 to the impost
   submitAnswers(state, context);
   readyAll(state, context);
 
-  // PLAYER_IDS[0] is the impostor (randomIndex = 0).
+  // PLAYER_IDS[0] is the impostor (randomIndex = 0) and cannot vote.
   // PLAYER_IDS[1] votes for impostor (+1 to PLAYER_IDS[1]).
   // PLAYER_IDS[2] votes for PLAYER_IDS[1] (+1 to impostor PLAYER_IDS[0]).
-  // Impostor votes for PLAYER_IDS[1] (impostor votes don't grant crewmate points).
   apply(state, PLAYER_IDS[1], { type: "vote", targetPlayerId: PLAYER_IDS[0] }, context);
   apply(state, PLAYER_IDS[2], { type: "vote", targetPlayerId: PLAYER_IDS[1] }, context);
-  apply(state, PLAYER_IDS[0], { type: "vote", targetPlayerId: PLAYER_IDS[1] }, context);
+  expect(state.round?.voteDeadlineAt).toBe(context.now + 5_000);
+  expect(advanceGameDeadline(state, { ...context, now: context.now + 5_000 })).toBe(true);
 
   expect(state.phase).toBe("results");
   expect(state.round?.roundPoints).toEqual({
@@ -512,7 +514,7 @@ test("roundCount limits match rounds and starting from lobby resets matchRound a
   readyAll(state, context);
   apply(state, PLAYER_IDS[1], { type: "vote", targetPlayerId: PLAYER_IDS[0] }, context);
   apply(state, PLAYER_IDS[2], { type: "vote", targetPlayerId: PLAYER_IDS[0] }, context);
-  apply(state, PLAYER_IDS[0], { type: "vote", targetPlayerId: PLAYER_IDS[1] }, context);
+  advanceGameDeadline(state, { ...context, now: context.now + 5_000 });
 
   apply(state, HOST_ID, { type: "next_round" }, context);
   expect(state.round?.matchRound).toBe(2);
@@ -520,11 +522,50 @@ test("roundCount limits match rounds and starting from lobby resets matchRound a
   readyAll(state, context);
   apply(state, PLAYER_IDS[1], { type: "vote", targetPlayerId: PLAYER_IDS[0] }, context);
   apply(state, PLAYER_IDS[2], { type: "vote", targetPlayerId: PLAYER_IDS[0] }, context);
-  apply(state, PLAYER_IDS[0], { type: "vote", targetPlayerId: PLAYER_IDS[1] }, context);
+  advanceGameDeadline(state, { ...context, now: context.now + 5_000 });
 
   expect(caughtPartyError(() => apply(state, HOST_ID, { type: "next_round" }, context)).code).toBe("FORBIDDEN");
   apply(state, HOST_ID, { type: "return_to_lobby" }, context);
   startRound(state, context);
   expect(state.round?.matchRound).toBe(1);
   expect(state.players.every((player) => (player.score ?? 0) === 0)).toBe(true);
+});
+
+test("save_draft preserves typed answers when the answer timer expires without locking in", () => {
+  const state = makeParty({
+    settings: { visibility: "private", questionRevealMode: "ready", questionSource: "builtin", answerTimeSeconds: 30 },
+  });
+  const context = makeContext([0, 0]);
+  startRound(state, context);
+
+  apply(state, PLAYER_IDS[0], { type: "save_draft", answer: "  draft text  " }, context);
+  expect(state.round?.readyPlayerIds).toEqual([]);
+  expect(state.round?.answers[PLAYER_IDS[0]]).toBe("draft text");
+
+  expect(advanceGameDeadline(state, { ...context, now: context.now + 32_000 })).toBe(true);
+  expect(state.phase).toBe("answers");
+  expect(state.round?.answers[PLAYER_IDS[0]]).toBe("draft text");
+  expect(state.round?.answers[PLAYER_IDS[1]]).toBe("—");
+});
+
+test("vote_reroll requires N-1 votes and keeps the skipped normalQuestion in usedNormalQuestions", () => {
+  const state = makeParty();
+  const context = makeContext([0, 0, 1, 0]);
+  startRound(state, context);
+  const firstQuestion = state.round!.normalQuestion;
+
+  apply(state, PLAYER_IDS[0], { type: "vote_reroll" }, context);
+  expect(state.round?.rerollVoterIds).toEqual([PLAYER_IDS[0]]);
+  expect(state.round?.normalQuestion).toBe(firstQuestion);
+
+  // Toggle off and back on
+  apply(state, PLAYER_IDS[0], { type: "vote_reroll" }, context);
+  expect(state.round?.rerollVoterIds).toEqual([]);
+  apply(state, PLAYER_IDS[0], { type: "vote_reroll" }, context);
+
+  // 2nd vote (N-1 = 2 for 3 players) triggers reroll while keeping firstQuestion tracked
+  apply(state, PLAYER_IDS[1], { type: "vote_reroll" }, context);
+  expect(state.round?.normalQuestion).not.toBe(firstQuestion);
+  expect(state.usedNormalQuestions).toContain(firstQuestion);
+  expect(state.round?.rerollVoterIds).toEqual([]);
 });

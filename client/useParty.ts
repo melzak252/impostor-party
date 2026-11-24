@@ -177,7 +177,6 @@ export function useParty(rawCode: string): UsePartyResult {
     const current = snapshotRef.current;
     if (!connected || !current || busyRef.current || removedReason) return null;
     busyRef.current = true;
-    setBusy(true);
     setError(null);
     try {
       const response = await sendAction(code, action, current.phase, current.round?.id ?? null);
@@ -187,11 +186,10 @@ export function useParty(rawCode: string): UsePartyResult {
     } catch (cause) {
       const apiError = asApiError(cause);
       if (apiError.snapshot) applySnapshot(apiError.snapshot);
-      setError(apiError);
+      if (apiError.code !== "STALE_ACTION") setError(apiError);
       return null;
     } finally {
       busyRef.current = false;
-      setBusy(false);
     }
   }, [applySnapshot, code, connected, removedReason]);
 
